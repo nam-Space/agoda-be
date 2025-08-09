@@ -37,13 +37,20 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'drf_spectacular',
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
-    "accounts",  # App của bạn
+    "accounts",  
+    "hotels",  
+    "bookings",  
+    "payments",
+    "reviews",
+    "notifications", 
 ]
 
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
@@ -93,7 +100,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "agoda",  # Tên cơ sở dữ liệu MySQL
         "USER": "root",  # Tên người dùng MySQL
-        "PASSWORD": "",  # Mật khẩu người dùng MySQL
+        "PASSWORD": "123456",  # Mật khẩu người dùng MySQL
         "HOST": "localhost",
         "PORT": "3306",
     },
@@ -142,3 +149,11 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.CustomUser"
+
+# Swagger settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Agoda API',
+    'DESCRIPTION': 'API cho hệ thống đặt phòng khách sạn',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
