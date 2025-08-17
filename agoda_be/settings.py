@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -37,20 +38,28 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'drf_spectacular',
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
-    "accounts",  
-    "hotels",  
-    "bookings",  
+    "accounts",
+    "hotels",
+    "bookings",
     "payments",
     "reviews",
-    "notifications", 
+    "notifications",
+    "drf_spectacular",
+    "rest_framework_simplejwt.token_blacklist",
 ]
 
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=2),  # Thời gian sống của access token
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),  # Thời gian sống của refresh token
+    "ROTATE_REFRESH_TOKENS": True,  # Cấp refresh token mới sau mỗi lần refresh
+    "BLACKLIST_AFTER_ROTATION": True,  # Blacklist refresh token cũ
+}
+
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
@@ -100,7 +109,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "agoda",  # Tên cơ sở dữ liệu MySQL
         "USER": "root",  # Tên người dùng MySQL
-        "PASSWORD": "123456",  # Mật khẩu người dùng MySQL
+        "PASSWORD": "",  # Mật khẩu người dùng MySQL
         "HOST": "localhost",
         "PORT": "3306",
     },
@@ -152,8 +161,11 @@ AUTH_USER_MODEL = "accounts.CustomUser"
 
 # Swagger settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Agoda API',
-    'DESCRIPTION': 'API cho hệ thống đặt phòng khách sạn',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
+    "TITLE": "Agoda API",
+    "DESCRIPTION": "API cho hệ thống đặt phòng khách sạn",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
