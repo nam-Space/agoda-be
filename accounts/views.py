@@ -3,9 +3,22 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
-from .serializers import RegisterSerializer, UserSerializer
+from .serializers import (
+    RegisterSerializer,
+    CreateUserSerializer,
+    UserSerializer,
+    UserAndPasswordSerializer,
+)
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
+from .models import CustomUser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from django.core.paginator import Paginator
+from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q
+import math
+from rest_framework import status
 
 
 # Đăng ký người dùng mới
@@ -25,31 +38,45 @@ class RegisterView(generics.CreateAPIView):
                 {
                     "isSuccess": True,
                     "message": "User registered successfully",
-                    "user": RegisterSerializer(
+                    "data": RegisterSerializer(
                         user
                     ).data,  # Trả về thông tin người dùng
-                },
-                status=200,
+                }
             )
 
         # Trả về lỗi nếu đăng ký không thành công
         return Response(
             {
-                "isSuccess": False,
-                "message": "Registration failed",
-                "errors": serializer.errors,
-            },
-            status=400,
+                "isSuccess": True,
+                "message": "User registered successfully",
+                "data": RegisterSerializer(user).data,  # Trả về thông tin người dùng
+            }
         )
 
 
 # Xem và cập nhật thông tin người dùng
-class UserDetailView(generics.RetrieveUpdateAPIView):
+class UserAccountDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
         return self.request.user
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve để trả về thông tin người dùng hiện tại.
+        """
+        instance = self.get_object()  # Lấy đối tượng người dùng hiện tại
+        serializer = self.get_serializer(instance)  # Serialize thông tin người dùng
+
+        # Trả về response với isSuccess và message
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "User account details fetched successfully",
+                "data": serializer.data,  # Trả về thông tin người dùng đã serialize
+            }
+        )
 
 
 # Đăng nhập và nhận JWT
@@ -68,12 +95,20 @@ class LoginView(APIView):
             return Response(
                 {
                     "isSuccess": True,
-                    "refresh": str(refresh),
-                    "access": str(refresh.access_token),
+                    "message": "Login successful",
+                    "data": {
+                        "refresh": str(refresh),
+                        "access": str(refresh.access_token),
+                    },
                 }
             )
+
         return Response(
-            {"isSuccess": False, "message": "Invalid credentials"}, status=400
+            {
+                "isSuccess": False,
+                "message": "Invalid credentials",
+                "data": {},
+            }
         )
 
 
@@ -84,7 +119,9 @@ class RefreshTokenView(APIView):
     def post(self, request):
         refresh_token = request.data.get("refresh")
         if not refresh_token:
-            return Response({"message": "Refresh token is required"}, status=400)
+            return Response(
+                {"isSuccess": False, "message": "Refresh token is required"}, status=400
+            )
 
         try:
             # Kiểm tra và làm mới refresh token cũ
@@ -95,7 +132,8 @@ class RefreshTokenView(APIView):
 
             if not user_id:
                 return Response(
-                    {"message": "User not found in refresh token"}, status=400
+                    {"isSuccess": False, "message": "User not found in refresh token"},
+                    status=400,
                 )
 
             # Lấy đối tượng người dùng từ user_id
@@ -111,8 +149,11 @@ class RefreshTokenView(APIView):
             return Response(
                 {
                     "isSuccess": True,
-                    "access": new_access_token,  # Access token mới
-                    "refresh": new_refresh_token_str,  # Refresh token mới
+                    "message": "Refresh token successfully!",
+                    "data": {
+                        "access": new_access_token,  # Access token mới
+                        "refresh": new_refresh_token_str,  # Refresh token mới
+                    },
                 }
             )
         except TokenError as e:
@@ -150,3 +191,213 @@ class LogoutView(APIView):
                 {"isSuccess": False, "message": f"Invalid refresh token: {str(e)}"},
                 status=400,
             )
+
+
+# Phân trang
+class UserPagination(PageNumberPagination):
+    page_size = 10  # Default value
+    currentPage = 1
+
+    def get_page_size(self, request):
+        # Lấy giá trị pageSize từ query string, nếu có
+        page_size = request.query_params.get("pageSize")
+        currentPage = request.query_params.get("current")
+
+        # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
+        self.page_size = int(page_size)
+        self.currentPage = int(currentPage)
+        return self.page_size
+
+    def get_paginated_response(self, data):
+        # Lấy tổng số bản ghi trong cơ sở dữ liệu
+        total_count = CustomUser.objects.all().count()
+
+        total_pages = math.ceil(total_count / self.page_size)
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Get users successfully!",
+                "meta": {
+                    "totalItems": total_count,  # Tổng số bản ghi
+                    "currentPage": self.currentPage,  # Trang hiện tại
+                    "itemsPerPage": self.page_size,  # Số bản ghi mỗi trang
+                    "totalPages": total_pages,
+                },
+                "data": data,  # Dữ liệu đã phân trang
+            }
+        )
+
+
+# API GET danh sách người dùng (với phân trang)
+class UserListView(generics.ListAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    pagination_class = UserPagination  # Áp dụng phân trang
+    permission_classes = [
+        IsAuthenticated
+    ]  # Bảo vệ API, chỉ người dùng đã đăng nhập mới có quyền truy cập
+    filter_backends = [DjangoFilterBackend]
+
+    def get_queryset(self):
+        """
+        Lọc dữ liệu theo query params và join với bảng liên quan (nếu cần).
+        Lọc động theo tất cả các trường trong CustomUser và join với các bảng khác.
+        """
+        queryset = CustomUser.objects.all()
+
+        # Lọc dữ liệu theo các tham số query string
+        filter_params = self.request.query_params
+        query_filter = Q()
+
+        # Duyệt qua các tham số query để tạo bộ lọc cho mỗi trường
+        for field, value in filter_params.items():
+            print(f"field={field}")
+            if (field != "current") and (
+                field != "pageSize"
+            ):  # Kiểm tra trường có tồn tại trong model CustomUser không
+                query_filter &= Q(
+                    **{f"{field}__icontains": value}
+                )  # Thêm điều kiện lọc cho mỗi trường
+
+        # Áp dụng lọc cho queryset
+        queryset = queryset.filter(query_filter)
+
+        # Lấy tham số 'current' từ query string để tính toán trang
+        current = self.request.query_params.get(
+            "current", 1
+        )  # Trang hiện tại, mặc định là trang 1
+        page_size = self.request.query_params.get(
+            "pageSize", 10
+        )  # Số phần tử mỗi trang, mặc định là 10
+
+        # Áp dụng phân trang
+        paginator = Paginator(queryset, page_size)
+        page = paginator.get_page(current)
+
+        return page
+
+
+# API GET chi tiết người dùng
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [
+        IsAuthenticated
+    ]  # Chỉ người dùng đã đăng nhập có thể cập nhật hoặc xóa
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve để trả về response chuẩn cho việc lấy thông tin chi tiết người dùng.
+        """
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+
+        # Trả về response với isSuccess và message
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "User details fetched successfully",
+                "data": serializer.data,  # Dữ liệu người dùng
+            }
+        )
+
+
+# API POST tạo người dùng
+class UserCreateView(generics.CreateAPIView):
+    serializer_class = CreateUserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        # Thực hiện đăng ký người dùng bằng serializer
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()  # Tạo người dùng mới
+
+            # Trả về response với isSuccess = True nếu người dùng đăng ký thành công
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "Create user successfully",
+                    "data": CreateUserSerializer(
+                        user
+                    ).data,  # Trả về thông tin người dùng
+                },
+                status=200,
+            )
+
+        # Trả về lỗi nếu đăng ký không thành công
+        return Response(
+            {
+                "isSuccess": False,
+                "message": "Creating user failed",
+                "errors": serializer.errors,
+            },
+            status=400,
+        )
+
+
+# API PUT hoặc PATCH để cập nhật thông tin người dùng
+class UserUpdateView(generics.UpdateAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserAndPasswordSerializer
+    permission_classes = [IsAuthenticated]  # Chỉ người dùng đã đăng nhập mới có thể sửa
+
+    def update(self, request, *args, **kwargs):
+        """
+        Cập nhật thông tin người dùng, bao gồm mật khẩu nếu có.
+        """
+        # Kiểm tra xem người dùng có gửi mật khẩu mới không
+        if "password" in request.data:
+            # Nếu có mật khẩu mới, sử dụng set_password để mã hóa mật khẩu
+            password = request.data.get("password")
+            request.data["password"] = password  # Mật khẩu đã được chuẩn bị để cập nhật
+
+        # Kiểm tra nếu có trường 'avatar' trong request để lưu đường dẫn ảnh vào cơ sở dữ liệu
+        if "avatar" in request.data:
+            avatar_url = request.data.get("avatar")  # Lấy đường dẫn ảnh từ request
+            # Cập nhật trường avatar trong cơ sở dữ liệu
+            request.data["avatar"] = avatar_url
+
+        # Sử dụng phương thức `update` chuẩn của Django để cập nhật thông tin người dùng
+        response = super().update(request, *args, **kwargs)
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "User information updated successfully",
+                "data": response.data,  # Trả về dữ liệu đã cập nhật
+            }
+        )
+
+
+# API DELETE xóa người dùng
+class UserDeleteView(generics.DestroyAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]  # Chỉ người dùng đã đăng nhập mới có thể xóa
+
+    def perform_destroy(self, instance):
+        """
+        Thực hiện soft delete: Cập nhật trường 'is_active' thành False thay vì xóa thực tế.
+        """
+        instance.is_active = (
+            False  # Đánh dấu người dùng là không hoạt động (soft delete)
+        )
+        instance.save()  # Lưu thay đổi vào cơ sở dữ liệu
+
+    def delete(self, request, *args, **kwargs):
+        """
+        Override phương thức delete để trả về response chuẩn.
+        """
+        instance = self.get_object()  # Lấy đối tượng người dùng cần xóa
+        self.perform_destroy(instance)  # Thực hiện soft delete
+
+        # Trả về response chuẩn với isSuccess và message
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "User soft deleted successfully",
+                "data": {},
+            }
+        )

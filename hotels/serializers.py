@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Hotel, Room
+from .models import Hotel, HotelImage
 
 
 class HotelSerializer(serializers.ModelSerializer):
@@ -8,7 +8,7 @@ class HotelSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class RoomSerializer(serializers.ModelSerializer):
+class HotelImageSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Room
+        model = HotelImage
         fields = "__all__"

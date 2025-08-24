@@ -32,6 +32,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "django_filters",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -43,10 +44,13 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "accounts",
     "hotels",
+    "rooms",
     "bookings",
     "payments",
     "reviews",
     "notifications",
+    "countries",
+    "cities",
     "drf_spectacular",
     "rest_framework_simplejwt.token_blacklist",
 ]
@@ -66,6 +70,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",  # Cho phép truy cập bất kỳ
     ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,  # Đặt số lượng mặc định trong mỗi trang
 }
 
 
@@ -169,3 +175,9 @@ SPECTACULAR_SETTINGS = {
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+
+import os
+
+# Cấu hình thư mục media
+MEDIA_URL = "/media/"  # URL để truy cập file media
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")  # Đường dẫn trên server để lưu trữ file

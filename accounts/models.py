@@ -23,6 +23,7 @@ class CustomUser(AbstractUser):
 
     birthday = models.DateField(null=True, blank=True)
     phone_number = models.CharField(max_length=15, null=True, blank=True)
+    avatar = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
         return self.username
