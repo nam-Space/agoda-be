@@ -29,7 +29,7 @@ class Hotel(models.Model):
 # Model để lưu thông tin về hình ảnh khách sạn
 class HotelImage(models.Model):
     hotel = models.ForeignKey("Hotel", related_name="images", on_delete=models.CASCADE)
-    image = models.ImageField(upload_to="hotel_images/")
+    image = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
