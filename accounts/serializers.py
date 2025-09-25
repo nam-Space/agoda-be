@@ -69,7 +69,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             phone_number=validated_data["phone_number"],
             gender=validated_data["gender"],
             role=validated_data["role"],
-            avatar=validated_data["avatar"],
+            avatar=validated_data.get("avatar", None),
         )
         return user
 
