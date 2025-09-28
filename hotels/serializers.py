@@ -16,6 +16,7 @@ class HotelImageSerializer(serializers.ModelSerializer):
 class HotelSerializer(serializers.ModelSerializer):
     images = HotelImageSerializer(many=True, read_only=True)
     city = CityCreateSerializer(read_only=True)
+    city_id = serializers.IntegerField(source="city.id", read_only=True)
 
     class Meta:
         model = Hotel

@@ -24,8 +24,16 @@ class HotelPagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
-        self.page_size = int(page_size)
-        self.currentPage = int(currentPage)
+        try:
+            self.page_size = int(page_size) if page_size is not None else self.page_size
+        except (ValueError, TypeError):
+            self.page_size = self.page_size
+
+        try:
+            self.currentPage = int(currentPage) if currentPage is not None else self.currentPage
+        except (ValueError, TypeError):
+            self.currentPage = self.currentPage
+
         return self.page_size
 
     def get_paginated_response(self, data):
@@ -49,7 +57,6 @@ class HotelPagination(PageNumberPagination):
 
 # API GET danh sách khách sạn (với phân trang)
 class HotelListView(generics.ListAPIView):
-    queryset = Hotel.objects.all()
     serializer_class = HotelSerializer
     pagination_class = HotelPagination
     authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
@@ -58,31 +65,20 @@ class HotelListView(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = Hotel.objects.all()
-
-        # Lọc dữ liệu theo query params
         filter_params = self.request.query_params
         query_filter = Q()
 
+        # lọc theo cityId (cityId là FK trong model Hotel)
+        city_id = filter_params.get("cityId")
+        if city_id:
+            query_filter &= Q(city_id=city_id)
+
+        # các filter khác
         for field, value in filter_params.items():
-            if field not in ["pageSize", "current"]:  # Bỏ qua các trường phân trang
+            if field not in ["pageSize", "current", "cityId"]:  
                 query_filter &= Q(**{f"{field}__icontains": value})
 
-        # Áp dụng lọc cho queryset
-        queryset = queryset.filter(query_filter)
-
-        # Lấy tham số 'current' từ query string để tính toán trang
-        current = self.request.query_params.get(
-            "current", 1
-        )  # Trang hiện tại, mặc định là trang 1
-        page_size = self.request.query_params.get(
-            "pageSize", 10
-        )  # Số phần tử mỗi trang, mặc định là 10
-
-        # Áp dụng phân trang
-        paginator = Paginator(queryset, page_size)
-        page = paginator.get_page(current)
-
-        return page
+        return queryset.filter(query_filter)
 
 
 class HotelCreateView(generics.CreateAPIView):
