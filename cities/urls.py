@@ -6,12 +6,20 @@ from .views import (
     CityCreateView,
     CityUpdateView,
     CityDeleteView,
+    TopVietnamCitiesView,
+    TopAbroadCitiesView,
 )
 
 urlpatterns = [
     path(
         "cities/", CityListView.as_view(), name="city-list"
     ),  # GET tất cả thành phố, phân trang
+    path(
+        "cities/top-vietnam/", TopVietnamCitiesView.as_view(), name="city-top-vietnam"
+    ),  # GET các điểm đến thu hút ở Việt Nam
+    path(
+        "cities/top-abroad/", TopAbroadCitiesView.as_view(), name="city-top-abroad"
+    ),  # GET các điểm đến nổi tiếng ngoài Việt Nam
     path(
         "cities/create/", CityCreateView.as_view(), name="city-create"
     ),  # POST tạo thành phố

@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "cities",
     "airports",
     "cars",
+    "promotions",
     "drf_spectacular",
     "rest_framework_simplejwt.token_blacklist",
 ]
@@ -117,7 +118,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "agoda",  # Tên cơ sở dữ liệu MySQL
         "USER": "root",  # Tên người dùng MySQL
-        "PASSWORD": "",  # Mật khẩu người dùng MySQL
+        "PASSWORD": "123456",  # Mật khẩu người dùng MySQL
         "HOST": "localhost",
         "PORT": "3306",
     },
