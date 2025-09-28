@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "cities",
     "airports",
     "cars",
+    "activities",
     "drf_spectacular",
     "rest_framework_simplejwt.token_blacklist",
 ]
