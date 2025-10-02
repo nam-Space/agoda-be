@@ -11,6 +11,7 @@ from django.core.paginator import Paginator
 from django_filters.rest_framework import DjangoFilterBackend
 import os
 from django.conf import settings
+from rest_framework import status
 
 
 # Phân trang
@@ -30,7 +31,9 @@ class HotelPagination(PageNumberPagination):
             self.page_size = self.page_size
 
         try:
-            self.currentPage = int(currentPage) if currentPage is not None else self.currentPage
+            self.currentPage = (
+                int(currentPage) if currentPage is not None else self.currentPage
+            )
         except (ValueError, TypeError):
             self.currentPage = self.currentPage
 
@@ -68,14 +71,14 @@ class HotelListView(generics.ListAPIView):
         filter_params = self.request.query_params
         query_filter = Q()
 
-        # lọc theo cityId (cityId là FK trong model Hotel)
+        # lọc theo city_id (city_id là FK trong model Hotel)
         city_id = filter_params.get("cityId")
         if city_id:
             query_filter &= Q(city_id=city_id)
 
         # các filter khác
         for field, value in filter_params.items():
-            if field not in ["pageSize", "current", "cityId"]:  
+            if field not in ["pageSize", "current", "cityId"]:
                 query_filter &= Q(**{f"{field}__icontains": value})
 
         return queryset.filter(query_filter)
@@ -191,19 +194,16 @@ class HotelDeleteView(generics.DestroyAPIView):
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể xóa khách sạn
 
-    def perform_destroy(self, instance):
-        """
-        Xóa hẳn khách sạn trong cơ sở dữ liệu.
-        """
-        instance.delete()  # Xóa khách sạn khỏi cơ sở dữ liệu
-
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
         return Response(
             {
                 "isSuccess": True,
                 "message": "Hotel deleted successfully",
                 "data": {},
             },
-            status=200,  # Trả về mã HTTP 200 khi xóa thành công
+            status=status.HTTP_200_OK,
         )
 
 

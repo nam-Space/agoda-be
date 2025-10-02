@@ -11,6 +11,7 @@ from django.core.paginator import Paginator
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Count
 from bookings.models import BookingStatus
+from rest_framework import status
 
 
 # Phân trang
@@ -174,19 +175,16 @@ class CityDeleteView(generics.DestroyAPIView):
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể xóa thành phố
 
-    def perform_destroy(self, instance):
-        """
-        Xóa hẳn thành phố trong cơ sở dữ liệu.
-        """
-        instance.delete()  # Xóa thành phố khỏi cơ sở dữ liệu
-
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
         return Response(
             {
                 "isSuccess": True,
                 "message": "City deleted successfully",
                 "data": {},
             },
-            status=200,  # Trả về mã HTTP 204 (No Content) khi xóa thành công
+            status=status.HTTP_200_OK,
         )
 
 
@@ -275,7 +273,7 @@ class TopAbroadCitiesView(APIView):
                     ),
                     distinct=True,
                 ),
-                hotel_count=Count("hotels", distinct=True), 
+                hotel_count=Count("hotels", distinct=True),
             )
             .order_by("-booking_count", "-created_at")[:limit]
         )

@@ -1,5 +1,5 @@
 from django.db import models
-from django.conf import settings
+from accounts.models import CustomUser
 
 
 class BookingStatus(models.TextChoices):
@@ -11,7 +11,7 @@ class BookingStatus(models.TextChoices):
 
 class Booking(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings"
+        CustomUser, on_delete=models.CASCADE, related_name="bookings"
     )
     room = models.ForeignKey(
         "rooms.Room", on_delete=models.CASCADE, related_name="bookings"

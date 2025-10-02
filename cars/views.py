@@ -9,6 +9,7 @@ from rest_framework.response import Response
 import math
 from django.core.paginator import Paginator
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status
 
 
 # Phân trang
@@ -177,17 +178,14 @@ class CarDeleteView(generics.DestroyAPIView):
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể xóa xe
 
-    def perform_destroy(self, instance):
-        """
-        Xóa hẳn xe trong cơ sở dữ liệu.
-        """
-        instance.delete()  # Xóa xe khỏi cơ sở dữ liệu
-
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
         return Response(
             {
                 "isSuccess": True,
                 "message": "Car deleted successfully",
                 "data": {},
             },
-            status=200,  # Trả về mã HTTP 204 (No Content) khi xóa thành công
+            status=status.HTTP_200_OK,
         )

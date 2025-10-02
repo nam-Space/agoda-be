@@ -8,6 +8,7 @@ from django.db.models import Q
 from rest_framework.response import Response
 import math
 from django.core.paginator import Paginator
+from rest_framework import status
 
 
 # Phân trang
@@ -176,17 +177,14 @@ class AirportDeleteView(generics.DestroyAPIView):
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể xóa sân bay
 
-    def perform_destroy(self, instance):
-        """
-        Xóa hẳn sân bay trong cơ sở dữ liệu.
-        """
-        instance.delete()  # Xóa sân bay khỏi cơ sở dữ liệu
-
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
         return Response(
             {
                 "isSuccess": True,
                 "message": "Airport deleted successfully",
                 "data": {},
             },
-            status=200,  # Trả về mã HTTP 204 (No Content) khi xóa thành công
+            status=status.HTTP_200_OK,
         )
