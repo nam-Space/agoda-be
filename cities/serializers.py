@@ -19,6 +19,7 @@ class CityCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = City
         fields = [
+            "id",
             "name",
             "description",
             "image",

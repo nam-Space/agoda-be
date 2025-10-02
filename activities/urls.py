@@ -8,6 +8,7 @@ from .views import (
     ActivityDeleteView,
     ActivityImageDeleteView,
     ActivityPackageListView,
+    ActivityPackageListForActivityAndDateLaunchView,
     ActivityPackageCreateView,
     ActivityPackageDetailView,
     ActivityPackageUpdateView,
@@ -17,6 +18,8 @@ from .views import (
     ActivityDateDetailView,
     ActivityDateUpdateView,
     ActivityDateDeleteView,
+    ActivityDateBulkCreateView,
+    ActivityDateBulkDeleteView,
 )
 
 urlpatterns = [
@@ -50,6 +53,11 @@ urlpatterns = [
         name="activity-package-list",
     ),  # GET tất cả activities-packages, phân trang
     path(
+        "activities-packages/activity-and-date-launch/",
+        ActivityPackageListForActivityAndDateLaunchView.as_view(),
+        name="activity-packages-list-for-activity-and-date-launch",
+    ),
+    path(
         "activities-packages/create/",
         ActivityPackageCreateView.as_view(),
         name="activity-package-create",
@@ -80,6 +88,11 @@ urlpatterns = [
         name="activity-date-create",
     ),  # POST tạo activities-dates
     path(
+        "activities-dates/create/bulk/",
+        ActivityDateBulkCreateView.as_view(),
+        name="activity-date-create-bulk",
+    ),  # POST tạo activities-dates
+    path(
         "activities-dates/<int:pk>/",
         ActivityDateDetailView.as_view(),
         name="activity-date-detail",
@@ -94,4 +107,9 @@ urlpatterns = [
         ActivityDateDeleteView.as_view(),
         name="activity-date-delete",
     ),  # DELETE xóa activities-dates
+    path(
+        "activities-dates/bulk-delete/",
+        ActivityDateBulkDeleteView.as_view(),
+        name="activity-date-bulk-delete",
+    ),
 ]

@@ -1,9 +1,10 @@
-# hotels/views.py
+# activities/views.py
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from .models import Activity, ActivityImage, ActivityPackage, ActivityDate
 from .serializers import (
     ActivitySerializer,
+    ActivityDetailSerializer,
     ActivityCreateSerializer,
     ActivityImageSerializer,
     ActivityPackageSerializer,
@@ -19,25 +20,43 @@ from django.core.paginator import Paginator
 from django_filters.rest_framework import DjangoFilterBackend
 import os
 from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework import status
 
 
 # Phân trang
 class ActivityPagination(PageNumberPagination):
     page_size = 10  # Default value
     currentPage = 1
+    filters = {}
 
     def get_page_size(self, request):
         # Lấy giá trị pageSize từ query string, nếu có
         page_size = request.query_params.get("pageSize")
         currentPage = request.query_params.get("current")
 
+        for field, value in request.query_params.items():
+            if field not in ["current", "pageSize", "cityId"]:
+                # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
+                self.filters[f"{field}"] = value
+
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
-        self.page_size = int(page_size)
-        self.currentPage = int(currentPage)
+        try:
+            self.page_size = int(page_size) if page_size is not None else self.page_size
+        except (ValueError, TypeError):
+            self.page_size = self.page_size
+
+        try:
+            self.currentPage = (
+                int(currentPage) if currentPage is not None else self.currentPage
+            )
+        except (ValueError, TypeError):
+            self.currentPage = self.currentPage
+
         return self.page_size
 
     def get_paginated_response(self, data):
-        total_count = Activity.objects.all().count()
+        total_count = Activity.objects.filter(**self.filters).count()
         total_pages = math.ceil(total_count / self.page_size)
 
         return Response(
@@ -71,8 +90,17 @@ class ActivityListView(generics.ListAPIView):
         filter_params = self.request.query_params
         query_filter = Q()
 
+        # lọc theo city_id (city_id là FK trong model Hotel)
+        city_id = filter_params.get("cityId")
+        if city_id:
+            query_filter &= Q(city_id=city_id)
+
         for field, value in filter_params.items():
-            if field not in ["pageSize", "current"]:  # Bỏ qua các trường phân trang
+            if field not in [
+                "pageSize",
+                "current",
+                "cityId",
+            ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
         # Áp dụng lọc cho queryset
@@ -112,7 +140,7 @@ class ActivityCreateView(generics.CreateAPIView):
             new_images = request.data.get("images", [])
             for image in new_images:
                 # Thêm ảnh vào bảng ActivityImage
-                ActivityImage.objects.create(hotel=activity, image=image)
+                ActivityImage.objects.create(activity=activity, image=image)
 
             return Response(
                 {
@@ -135,7 +163,7 @@ class ActivityCreateView(generics.CreateAPIView):
 
 class ActivityDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Activity.objects.all()
-    serializer_class = ActivitySerializer
+    serializer_class = ActivityDetailSerializer
     authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
     permission_classes = []  # Không cần kiểm tra quyền
 
@@ -203,19 +231,16 @@ class ActivityDeleteView(generics.DestroyAPIView):
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể xóa activity
 
-    def perform_destroy(self, instance):
-        """
-        Xóa hẳn activity trong cơ sở dữ liệu.
-        """
-        instance.delete()  # Xóa activity khỏi cơ sở dữ liệu
-
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
         return Response(
             {
                 "isSuccess": True,
                 "message": "Activity deleted successfully",
                 "data": {},
             },
-            status=200,  # Trả về mã HTTP 200 khi xóa thành công
+            status=status.HTTP_200_OK,
         )
 
 
@@ -327,6 +352,40 @@ class ActivityPackageListView(generics.ListAPIView):
         return page
 
 
+# API GET danh sách activity package dựa trên activity_id và date_launch (không phân trang)
+class ActivityPackageListForActivityAndDateLaunchView(generics.ListAPIView):
+    serializer_class = ActivityPackageSerializer
+    authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
+    permission_classes = []  # Không cần kiểm tra quyền
+
+    def get_queryset(self):
+        queryset = ActivityPackage.objects.all()
+        activity_id = self.request.query_params.get("activity_id")
+        date_launch = self.request.query_params.get("date_launch")
+
+        if activity_id:
+            queryset = queryset.filter(activity_id=activity_id)
+
+        if date_launch:
+            queryset = queryset.filter(activities_dates__date_launch=date_launch)
+
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": (
+                    "Get activity package successfully!" if queryset else "No data"
+                ),
+                "data": serializer.data,
+            }
+        )
+
+
 # API GET chi tiết activity package
 class ActivityPackageDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ActivityPackage.objects.all()
@@ -423,19 +482,16 @@ class ActivityPackageDeleteView(generics.DestroyAPIView):
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể xóa activity package
 
-    def perform_destroy(self, instance):
-        """
-        Xóa hẳn activity package trong cơ sở dữ liệu.
-        """
-        instance.delete()  # Xóa activity package khỏi cơ sở dữ liệu
-
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
         return Response(
             {
                 "isSuccess": True,
                 "message": "ActivityPackage deleted successfully",
                 "data": {},
             },
-            status=200,  # Trả về mã HTTP 204 (No Content) khi xóa thành công
+            status=status.HTTP_200_OK,
         )
 
 
@@ -565,6 +621,49 @@ class ActivityDateCreateView(generics.CreateAPIView):
         )
 
 
+class ActivityDateBulkCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        activity_package_id = request.data.get("activity_package")
+        price_adult = request.data.get("price_adult")
+        price_child = request.data.get("price_child")
+        adult_quantity = request.data.get("adult_quantity")
+        child_quantity = request.data.get("child_quantity")
+        dates = request.data.get("dates", [])
+
+        if not activity_package_id or not dates:
+            return Response(
+                {
+                    "isSuccess": False,
+                    "message": "Missing required fields: activity_package or dates",
+                    "data": {},
+                },
+                status=400,
+            )
+
+        created_dates = []
+        for date_str in dates:
+            activity_date = ActivityDate.objects.create(
+                activity_package_id=activity_package_id,
+                price_adult=price_adult,
+                price_child=price_child,
+                adult_quantity=adult_quantity,
+                child_quantity=child_quantity,
+                date_launch=date_str,  # date_str phải đúng format datetime
+            )
+            created_dates.append(ActivityDateCreateSerializer(activity_date).data)
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": f"Created {len(created_dates)} ActivityDate(s) successfully",
+                "data": created_dates,
+            },
+            status=200,
+        )
+
+
 # API PUT hoặc PATCH để cập nhật activity date
 class ActivityDateUpdateView(generics.UpdateAPIView):
     queryset = ActivityDate.objects.all()
@@ -601,21 +700,59 @@ class ActivityDateUpdateView(generics.UpdateAPIView):
 class ActivityDateDeleteView(generics.DestroyAPIView):
     queryset = ActivityDate.objects.all()
     serializer_class = ActivityDateCreateSerializer
-    permission_classes = [
-        IsAuthenticated
-    ]  # Chỉ người dùng đã đăng nhập mới có thể xóa activity date
+    permission_classes = [IsAuthenticated]
 
-    def perform_destroy(self, instance):
-        """
-        Xóa hẳn activity date trong cơ sở dữ liệu.
-        """
-        instance.delete()  # Xóa activity date khỏi cơ sở dữ liệu
-
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
         return Response(
             {
                 "isSuccess": True,
                 "message": "ActivityDate deleted successfully",
                 "data": {},
             },
-            status=200,  # Trả về mã HTTP 204 (No Content) khi xóa thành công
+            status=status.HTTP_200_OK,
+        )
+
+
+class ActivityDateBulkDeleteView(APIView):
+    permission_classes = [IsAuthenticated]  # Bắt buộc user đăng nhập
+
+    def delete(self, request, *args, **kwargs):
+        ids = request.data.get("ids", [])
+
+        if not isinstance(ids, list) or not ids:
+            return Response(
+                {
+                    "isSuccess": False,
+                    "message": "Invalid or empty 'ids' list",
+                    "data": {},
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Lấy tất cả các bản ghi cần xóa
+        dates_to_delete = ActivityDate.objects.filter(id__in=ids)
+        deleted_count = dates_to_delete.count()
+
+        if deleted_count == 0:
+            return Response(
+                {
+                    "isSuccess": False,
+                    "message": "No ActivityDate found for given ids",
+                    "data": {},
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Xóa các bản ghi
+        dates_to_delete.delete()
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": f"Deleted {deleted_count} ActivityDate(s) successfully",
+                "data": {"deleted_ids": ids},
+            },
+            status=status.HTTP_200_OK,
         )

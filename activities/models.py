@@ -7,11 +7,25 @@ from cities.models import City  # Liên kết với model Country
 class Activity(models.Model):
     name = models.CharField(max_length=255, null=True, blank=True)
     city = models.ForeignKey(City, on_delete=models.CASCADE, related_name="activities")
-    short_description = models.CharField(max_length=255, null=True, blank=True)
+    CATEGORY_CHOICES = [
+        ("journey", "Journey"),
+        ("moving", "Moving"),
+        ("experience", "Experience"),
+        ("food", "Food"),
+        ("tourist_attractions", "Tourist_Attractions"),
+        ("travel_preparation", "Travel_Preparation"),
+    ]
+    category = models.CharField(
+        max_length=255, choices=CATEGORY_CHOICES, default="journey"
+    )
+    short_description = models.TextField(blank=True, null=True)
     more_information = models.TextField(blank=True, null=True)  # Trường description mới
     cancellation_policy = models.TextField(
         blank=True, null=True
-    )  # Trường description mới
+    )  # Trường cancellation_policy mới
+    departure_information = models.TextField(
+        blank=True, null=True
+    )  # Trường departure_information mới
     avg_price = models.FloatField(default=0.0)
     avg_star = models.FloatField(default=0.0)
     total_time = models.PositiveIntegerField()  # số giờ hoạt động
@@ -52,8 +66,10 @@ class ActivityDate(models.Model):
     activity_package = models.ForeignKey(
         "ActivityPackage", on_delete=models.CASCADE, related_name="activities_dates"
     )
-    name = models.CharField(max_length=255, null=True, blank=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price_adult = models.FloatField(default=0.0)
+    price_child = models.FloatField(default=0.0)
+    adult_quantity = models.PositiveIntegerField(default=1)
+    child_quantity = models.PositiveIntegerField(default=1)
     date_launch = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

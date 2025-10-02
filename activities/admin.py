@@ -34,6 +34,14 @@ class ActivityPackageAdmin(admin.ModelAdmin):
 
 @admin.register(ActivityDate)
 class ActivityDateAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "activity_package", "price", "date_launch")
-    search_fields = ("name", "activity_package__name")
+    list_display = (
+        "id",
+        "activity_package",
+        "price_adult",
+        "price_child",
+        "adult_quantity",
+        "child_quantity",
+        "date_launch",
+    )
+    search_fields = "date_launch", "activity_package__name"
     list_filter = ("activity_package", "date_launch")

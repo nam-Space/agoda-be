@@ -1,14 +1,17 @@
 # cities/views.py
 from rest_framework import generics
+from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from .models import City
 from .serializers import CitySerializer, CityCreateSerializer
 from rest_framework.pagination import PageNumberPagination
-from django.db.models import Q
 from rest_framework.response import Response
 import math
 from django.core.paginator import Paginator
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q, Count
+from bookings.models import BookingStatus
+from rest_framework import status
 
 
 # Phân trang
@@ -17,13 +20,8 @@ class CityPagination(PageNumberPagination):
     currentPage = 1
 
     def get_page_size(self, request):
-        # Lấy giá trị pageSize từ query string, nếu có
-        page_size = request.query_params.get("pageSize")
-        currentPage = request.query_params.get("current")
-
-        # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
-        self.page_size = int(page_size)
-        self.currentPage = int(currentPage)
+        self.page_size = int(request.query_params.get("pageSize", 10))
+        self.currentPage = int(request.query_params.get("current", 1))
         return self.page_size
 
     def get_paginated_response(self, data):
@@ -177,17 +175,123 @@ class CityDeleteView(generics.DestroyAPIView):
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể xóa thành phố
 
-    def perform_destroy(self, instance):
-        """
-        Xóa hẳn thành phố trong cơ sở dữ liệu.
-        """
-        instance.delete()  # Xóa thành phố khỏi cơ sở dữ liệu
-
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
         return Response(
             {
                 "isSuccess": True,
                 "message": "City deleted successfully",
                 "data": {},
             },
-            status=200,  # Trả về mã HTTP 204 (No Content) khi xóa thành công
+            status=status.HTTP_200_OK,
+        )
+
+
+# API: Các điểm đến thu hút nhất Việt Nam
+class TopVietnamCitiesView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        limit_param = request.query_params.get("limit", 10)
+        try:
+            limit = int(limit_param)
+        except (TypeError, ValueError):
+            limit = 10
+
+        # Chấp nhận cả tên "Vietnam" và "Việt Nam"
+        vietnam_filter = Q(country__name__iexact="Vietnam") | Q(
+            country__name__iexact="Việt Nam"
+        )
+
+        # Tính điểm thu hút dựa trên số booking (đã xác nhận hoặc hoàn tất)
+        cities = (
+            City.objects.filter(vietnam_filter)
+            .annotate(
+                booking_count=Count(
+                    "hotels__rooms__bookings",
+                    filter=Q(
+                        hotels__rooms__bookings__status__in=[
+                            BookingStatus.CONFIRMED,
+                            BookingStatus.COMPLETED,
+                        ]
+                    ),
+                    distinct=True,
+                ),
+                hotel_count=Count("hotels", distinct=True),
+            )
+            .order_by("-booking_count", "-created_at")[:limit]
+        )
+
+        # Trả về kèm theo chỉ số booking_count
+        data = [
+            {
+                **CitySerializer(city).data,
+                "bookingCount": getattr(city, "booking_count", 0),
+                "hotelCount": getattr(city, "hotel_count", 0),
+            }
+            for city in cities
+        ]
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched top destinations in Vietnam",
+                "meta": {"limit": limit},
+                "data": data,
+            }
+        )
+
+
+# API: Các điểm đến nổi tiếng ngoài Việt Nam
+class TopAbroadCitiesView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        limit_param = request.query_params.get("limit", 10)
+        try:
+            limit = int(limit_param)
+        except (TypeError, ValueError):
+            limit = 10
+
+        vietnam_filter = Q(country__name__iexact="Vietnam") | Q(
+            country__name__iexact="Việt Nam"
+        )
+
+        cities = (
+            City.objects.exclude(vietnam_filter)
+            .annotate(
+                booking_count=Count(
+                    "hotels__rooms__bookings",
+                    filter=Q(
+                        hotels__rooms__bookings__status__in=[
+                            BookingStatus.CONFIRMED,
+                            BookingStatus.COMPLETED,
+                        ]
+                    ),
+                    distinct=True,
+                ),
+                hotel_count=Count("hotels", distinct=True),
+            )
+            .order_by("-booking_count", "-created_at")[:limit]
+        )
+
+        data = [
+            {
+                **CitySerializer(city).data,
+                "bookingCount": getattr(city, "booking_count", 0),
+                "hotelCount": getattr(city, "hotel_count", 0),
+            }
+            for city in cities
+        ]
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched famous destinations outside Vietnam",
+                "meta": {"limit": limit},
+                "data": data,
+            }
         )
