@@ -34,11 +34,15 @@ class ActivityPagination(PageNumberPagination):
         # Lấy giá trị pageSize từ query string, nếu có
         page_size = request.query_params.get("pageSize")
         currentPage = request.query_params.get("current")
+        city_id = request.query_params.get("city_id")
+
+        if city_id:
+            self.filters["city_id"] = city_id
 
         for field, value in request.query_params.items():
-            if field not in ["current", "pageSize", "cityId"]:
+            if field not in ["current", "pageSize", "city_id"]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
-                self.filters[f"{field}"] = value
+                self.filters[f"{field}__icontains"] = value
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
         try:
@@ -56,8 +60,11 @@ class ActivityPagination(PageNumberPagination):
         return self.page_size
 
     def get_paginated_response(self, data):
+
         total_count = Activity.objects.filter(**self.filters).count()
         total_pages = math.ceil(total_count / self.page_size)
+
+        self.filters.clear()
 
         return Response(
             {
@@ -91,7 +98,7 @@ class ActivityListView(generics.ListAPIView):
         query_filter = Q()
 
         # lọc theo city_id (city_id là FK trong model Hotel)
-        city_id = filter_params.get("cityId")
+        city_id = filter_params.get("city_id")
         if city_id:
             query_filter &= Q(city_id=city_id)
 
@@ -99,7 +106,7 @@ class ActivityListView(generics.ListAPIView):
             if field not in [
                 "pageSize",
                 "current",
-                "cityId",
+                "city_id",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 

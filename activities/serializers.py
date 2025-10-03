@@ -56,6 +56,7 @@ class ActivityCreateSerializer(serializers.ModelSerializer):
         fields = [
             "city",
             "name",
+            "category",
             "short_description",
             "more_information",
             "cancellation_policy",
