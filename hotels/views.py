@@ -1,3 +1,247 @@
+# # hotels/views.py
+# from rest_framework import generics
+# from rest_framework.permissions import IsAuthenticated
+# from .models import Hotel, HotelImage
+# from .serializers import HotelSerializer, HotelCreateSerializer, HotelImageSerializer
+# from rest_framework.pagination import PageNumberPagination
+# from django.db.models import Q
+# from rest_framework.response import Response
+# import math
+# from django.core.paginator import Paginator
+# from django_filters.rest_framework import DjangoFilterBackend
+# import os
+# from django.conf import settings
+
+
+# # Phân trang
+# class HotelPagination(PageNumberPagination):
+#     page_size = 10  # Default value
+#     currentPage = 1
+
+#     def get_page_size(self, request):
+#         # Lấy giá trị pageSize từ query string, nếu có
+#         page_size = request.query_params.get("pageSize")
+#         currentPage = request.query_params.get("current")
+
+#         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
+#         self.page_size = int(page_size)
+#         self.currentPage = int(currentPage)
+#         return self.page_size
+
+#     def get_paginated_response(self, data):
+#         total_count = Hotel.objects.all().count()
+#         total_pages = math.ceil(total_count / self.page_size)
+
+#         return Response(
+#             {
+#                 "isSuccess": True,
+#                 "message": "Fetched hotels successfully!",
+#                 "meta": {
+#                     "totalItems": total_count,
+#                     "currentPage": self.currentPage,
+#                     "itemsPerPage": self.page_size,
+#                     "totalPages": total_pages,
+#                 },
+#                 "data": data,
+#             }
+#         )
+
+
+# # API GET danh sách khách sạn (với phân trang)
+# class HotelListView(generics.ListAPIView):
+#     queryset = Hotel.objects.all()
+#     serializer_class = HotelSerializer
+#     pagination_class = HotelPagination
+#     authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
+#     permission_classes = []  # Không cần kiểm tra quyền
+#     filter_backends = [DjangoFilterBackend]
+
+#     def get_queryset(self):
+#         queryset = Hotel.objects.all()
+#         filter_params = self.request.query_params
+        
+#         # Xử lý city filter riêng
+#         city_id = filter_params.get('city')
+#         if city_id:
+#             queryset = queryset.filter(city_id=city_id)
+        
+#         query_filter = Q()
+#         for field, value in filter_params.items():
+#             if field not in ["pageSize", "current", "city"]:  # Thêm "city"
+#                 query_filter &= Q(**{f"{field}__icontains": value})
+
+#         queryset = queryset.filter(query_filter)
+        
+#         # Phần pagination giữ nguyên
+#         current = self.request.query_params.get("current", 1)
+#         page_size = self.request.query_params.get("pageSize", 10)
+#         paginator = Paginator(queryset, page_size)
+#         page = paginator.get_page(current)
+        
+#         return page
+
+
+# class HotelCreateView(generics.CreateAPIView):
+#     queryset = Hotel.objects.all()
+#     serializer_class = HotelCreateSerializer
+#     permission_classes = [
+#         IsAuthenticated
+#     ]  # Chỉ người dùng đã đăng nhập mới có thể tạo khách sạn
+
+#     def create(self, request, *args, **kwargs):
+#         # Lấy dữ liệu từ request
+#         serializer = self.get_serializer(data=request.data)
+
+#         if serializer.is_valid():
+#             # Lưu khách sạn mới
+#             hotel = serializer.save()
+
+#             # Kiểm tra xem có ảnh được gửi lên không
+#             new_images = request.data.get("images", [])
+#             for image in new_images:
+#                 # Thêm ảnh vào bảng HotelImage
+#                 HotelImage.objects.create(hotel=hotel, image=image)
+
+#             return Response(
+#                 {
+#                     "isSuccess": True,
+#                     "message": "Hotel created successfully",
+#                     "data": HotelCreateSerializer(hotel).data,
+#                 },
+#                 status=200,
+#             )
+
+#         return Response(
+#             {
+#                 "isSuccess": False,
+#                 "message": "Failed to create hotel",
+#                 "data": serializer.errors,
+#             },
+#             status=400,
+#         )
+
+
+# class HotelDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = Hotel.objects.all()
+#     serializer_class = HotelSerializer
+#     authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
+#     permission_classes = []  # Không cần kiểm tra quyền
+
+#     def retrieve(self, request, *args, **kwargs):
+#         """
+#         Override phương thức `retrieve` để trả về response chuẩn cho việc lấy thông tin chi tiết khách sạn.
+#         """
+#         instance = self.get_object()
+#         serializer = self.get_serializer(instance)
+
+#         return Response(
+#             {
+#                 "isSuccess": True,
+#                 "message": "Hotel details fetched successfully",
+#                 "data": serializer.data,  # Dữ liệu khách sạn
+#             }
+#         )
+
+
+# class HotelUpdateView(generics.UpdateAPIView):
+#     queryset = Hotel.objects.all()
+#     serializer_class = HotelCreateSerializer
+#     permission_classes = [
+#         IsAuthenticated
+#     ]  # Chỉ người dùng đã đăng nhập mới có thể sửa khách sạn
+
+#     def update(self, request, *args, **kwargs):
+#         hotel = self.get_object()
+#         serializer = self.get_serializer(hotel, data=request.data, partial=True)
+
+#         if serializer.is_valid():
+#             # Lưu các thay đổi của khách sạn
+#             updated_hotel = serializer.save()
+
+#             # Xóa ảnh cũ liên quan đến khách sạn này
+#             HotelImage.objects.filter(hotel=updated_hotel).delete()
+
+#             # Kiểm tra xem có ảnh mới không, nếu có thì thêm ảnh mới vào
+#             new_images = request.data.get("images", [])
+#             for image in new_images:
+#                 HotelImage.objects.create(hotel=updated_hotel, image=image)
+
+#             return Response(
+#                 {
+#                     "isSuccess": True,
+#                     "message": "Hotel updated successfully",
+#                     "data": HotelCreateSerializer(updated_hotel).data,
+#                 }
+#             )
+
+#         return Response(
+#             {
+#                 "isSuccess": False,
+#                 "message": "Failed to update hotel",
+#                 "data": serializer.errors,
+#             },
+#             status=400,
+#         )
+
+
+# class HotelDeleteView(generics.DestroyAPIView):
+#     queryset = Hotel.objects.all()
+#     serializer_class = HotelCreateSerializer
+#     permission_classes = [
+#         IsAuthenticated
+#     ]  # Chỉ người dùng đã đăng nhập mới có thể xóa khách sạn
+
+#     def perform_destroy(self, instance):
+#         """
+#         Xóa hẳn khách sạn trong cơ sở dữ liệu.
+#         """
+#         instance.delete()  # Xóa khách sạn khỏi cơ sở dữ liệu
+
+#         return Response(
+#             {
+#                 "isSuccess": True,
+#                 "message": "Hotel deleted successfully",
+#                 "data": {},
+#             },
+#             status=200,  # Trả về mã HTTP 200 khi xóa thành công
+#         )
+
+
+# class HotelImageDeleteView(generics.DestroyAPIView):
+#     queryset = HotelImage.objects.all()
+#     serializer_class = HotelImageSerializer
+#     permission_classes = [
+#         IsAuthenticated
+#     ]  # Chỉ người dùng đã đăng nhập mới có thể xóa ảnh khách sạn
+
+#     def perform_destroy(self, instance):
+#         """
+#         Xóa hẳn ảnh khách sạn khỏi cơ sở dữ liệu và hệ thống tệp.
+#         """
+#         # Lấy đường dẫn tệp ảnh
+#         image_path = instance.image
+
+#         # Nếu đường dẫn ảnh bắt đầu với "/media", ta loại bỏ nó để tránh trùng lặp
+#         if image_path.startswith("/media"):
+#             image_path = image_path.lstrip("/media")
+
+#         full_image_path = os.path.join(settings.MEDIA_ROOT, image_path.lstrip("/"))
+
+#         # Xóa ảnh khỏi hệ thống tệp (nếu tệp tồn tại)
+#         if os.path.exists(full_image_path):
+#             os.remove(full_image_path)
+
+#         instance.delete()  # Xóa ảnh khách sạn khỏi cơ sở dữ liệu
+
+#         return Response(
+#             {
+#                 "isSuccess": True,
+#                 "message": "HotelImage deleted successfully",
+#                 "data": {},
+#             },
+#             status=200,  # Trả về mã HTTP 200 khi xóa thành công
+#         )
+
 # hotels/views.py
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
@@ -6,238 +250,159 @@ from .serializers import HotelSerializer, HotelCreateSerializer, HotelImageSeria
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from rest_framework.response import Response
-import math
-from django.core.paginator import Paginator
 from django_filters.rest_framework import DjangoFilterBackend
 import os
 from django.conf import settings
-from rest_framework import status
 
-
-# Phân trang
+# -------------------- Pagination --------------------
 class HotelPagination(PageNumberPagination):
-    page_size = 10  # Default value
-    currentPage = 1
-
-    def get_page_size(self, request):
-        # Lấy giá trị pageSize từ query string, nếu có
-        page_size = request.query_params.get("pageSize")
-        currentPage = request.query_params.get("current")
-
-        # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
-        try:
-            self.page_size = int(page_size) if page_size is not None else self.page_size
-        except (ValueError, TypeError):
-            self.page_size = self.page_size
-
-        try:
-            self.currentPage = (
-                int(currentPage) if currentPage is not None else self.currentPage
-            )
-        except (ValueError, TypeError):
-            self.currentPage = self.currentPage
-
-        return self.page_size
+    page_size = 10  # default
+    page_size_query_param = "pageSize"
+    page_query_param = "current"
 
     def get_paginated_response(self, data):
-        total_count = Hotel.objects.all().count()
-        total_pages = math.ceil(total_count / self.page_size)
+        return Response({
+            "isSuccess": True,
+            "message": "Fetched hotels successfully!",
+            "meta": {
+                "totalItems": self.page.paginator.count,
+                "currentPage": self.page.number,
+                "itemsPerPage": self.get_page_size(self.request),
+                "totalPages": self.page.paginator.num_pages,
+            },
+            "data": data,
+        })
 
-        return Response(
-            {
-                "isSuccess": True,
-                "message": "Fetched hotels successfully!",
-                "meta": {
-                    "totalItems": total_count,
-                    "currentPage": self.currentPage,
-                    "itemsPerPage": self.page_size,
-                    "totalPages": total_pages,
-                },
-                "data": data,
-            }
-        )
-
-
-# API GET danh sách khách sạn (với phân trang)
+# -------------------- Hotel List --------------------
 class HotelListView(generics.ListAPIView):
+    queryset = Hotel.objects.all()
     serializer_class = HotelSerializer
     pagination_class = HotelPagination
-    authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
-    permission_classes = []  # Không cần kiểm tra quyền
+    authentication_classes = []  # bỏ auth
+    permission_classes = []  # bỏ permission
     filter_backends = [DjangoFilterBackend]
 
     def get_queryset(self):
         queryset = Hotel.objects.all()
-        filter_params = self.request.query_params
-        query_filter = Q()
+        params = self.request.query_params
 
-        # lọc theo city_id (city_id là FK trong model Hotel)
-        city_id = filter_params.get("cityId")
+        # ---- city_id filter ----
+        city_id = params.get('cityId')
         if city_id:
-            query_filter &= Q(city_id=city_id)
+            try:
+                city_id = int(city_id)
+                queryset = queryset.filter(city_id=city_id)
+            except ValueError:
+                return Hotel.objects.none()
 
-        # các filter khác
-        for field, value in filter_params.items():
+        # ---- other filters ----
+        q_filter = Q()
+        for field, value in params.items():
             if field not in ["pageSize", "current", "cityId"]:
-                query_filter &= Q(**{f"{field}__icontains": value})
+                # Chỉ filter những field tồn tại trong model
+                if field in [f.name for f in Hotel._meta.get_fields()]:
+                    q_filter &= Q(**{f"{field}__icontains": value})
+        queryset = queryset.filter(q_filter)
 
-        return queryset.filter(query_filter)
+        return queryset
 
-
+# -------------------- Hotel Create --------------------
 class HotelCreateView(generics.CreateAPIView):
     queryset = Hotel.objects.all()
     serializer_class = HotelCreateSerializer
-    permission_classes = [
-        IsAuthenticated
-    ]  # Chỉ người dùng đã đăng nhập mới có thể tạo khách sạn
+    permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        # Lấy dữ liệu từ request
         serializer = self.get_serializer(data=request.data)
-
         if serializer.is_valid():
-            # Lưu khách sạn mới
             hotel = serializer.save()
-
-            # Kiểm tra xem có ảnh được gửi lên không
             new_images = request.data.get("images", [])
             for image in new_images:
-                # Thêm ảnh vào bảng HotelImage
                 HotelImage.objects.create(hotel=hotel, image=image)
+            return Response({
+                "isSuccess": True,
+                "message": "Hotel created successfully",
+                "data": HotelCreateSerializer(hotel).data,
+            }, status=200)
+        return Response({
+            "isSuccess": False,
+            "message": "Failed to create hotel",
+            "data": serializer.errors,
+        }, status=400)
 
-            return Response(
-                {
-                    "isSuccess": True,
-                    "message": "Hotel created successfully",
-                    "data": HotelCreateSerializer(hotel).data,
-                },
-                status=200,
-            )
-
-        return Response(
-            {
-                "isSuccess": False,
-                "message": "Failed to create hotel",
-                "data": serializer.errors,
-            },
-            status=400,
-        )
-
-
+# -------------------- Hotel Detail --------------------
 class HotelDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Hotel.objects.all()
     serializer_class = HotelSerializer
-    authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
-    permission_classes = []  # Không cần kiểm tra quyền
+    authentication_classes = []
+    permission_classes = []
 
     def retrieve(self, request, *args, **kwargs):
-        """
-        Override phương thức `retrieve` để trả về response chuẩn cho việc lấy thông tin chi tiết khách sạn.
-        """
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
+        hotel = self.get_object()
+        serializer = self.get_serializer(hotel)
+        return Response({
+            "isSuccess": True,
+            "message": "Hotel details fetched successfully",
+            "data": serializer.data
+        })
 
-        return Response(
-            {
-                "isSuccess": True,
-                "message": "Hotel details fetched successfully",
-                "data": serializer.data,  # Dữ liệu khách sạn
-            }
-        )
-
-
+# -------------------- Hotel Update --------------------
 class HotelUpdateView(generics.UpdateAPIView):
     queryset = Hotel.objects.all()
     serializer_class = HotelCreateSerializer
-    permission_classes = [
-        IsAuthenticated
-    ]  # Chỉ người dùng đã đăng nhập mới có thể sửa khách sạn
+    permission_classes = [IsAuthenticated]
 
     def update(self, request, *args, **kwargs):
         hotel = self.get_object()
         serializer = self.get_serializer(hotel, data=request.data, partial=True)
-
         if serializer.is_valid():
-            # Lưu các thay đổi của khách sạn
             updated_hotel = serializer.save()
-
-            # Xóa ảnh cũ liên quan đến khách sạn này
+            # xóa ảnh cũ
             HotelImage.objects.filter(hotel=updated_hotel).delete()
-
-            # Kiểm tra xem có ảnh mới không, nếu có thì thêm ảnh mới vào
             new_images = request.data.get("images", [])
             for image in new_images:
                 HotelImage.objects.create(hotel=updated_hotel, image=image)
+            return Response({
+                "isSuccess": True,
+                "message": "Hotel updated successfully",
+                "data": HotelCreateSerializer(updated_hotel).data,
+            })
+        return Response({
+            "isSuccess": False,
+            "message": "Failed to update hotel",
+            "data": serializer.errors,
+        }, status=400)
 
-            return Response(
-                {
-                    "isSuccess": True,
-                    "message": "Hotel updated successfully",
-                    "data": HotelCreateSerializer(updated_hotel).data,
-                }
-            )
-
-        return Response(
-            {
-                "isSuccess": False,
-                "message": "Failed to update hotel",
-                "data": serializer.errors,
-            },
-            status=400,
-        )
-
-
+# -------------------- Hotel Delete --------------------
 class HotelDeleteView(generics.DestroyAPIView):
     queryset = Hotel.objects.all()
     serializer_class = HotelCreateSerializer
-    permission_classes = [
-        IsAuthenticated
-    ]  # Chỉ người dùng đã đăng nhập mới có thể xóa khách sạn
+    permission_classes = [IsAuthenticated]
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response(
-            {
-                "isSuccess": True,
-                "message": "Hotel deleted successfully",
-                "data": {},
-            },
-            status=status.HTTP_200_OK,
-        )
+    def perform_destroy(self, instance):
+        instance.delete()
+        return Response({
+            "isSuccess": True,
+            "message": "Hotel deleted successfully",
+            "data": {},
+        }, status=200)
 
-
+# -------------------- Hotel Image Delete --------------------
 class HotelImageDeleteView(generics.DestroyAPIView):
     queryset = HotelImage.objects.all()
     serializer_class = HotelImageSerializer
-    permission_classes = [
-        IsAuthenticated
-    ]  # Chỉ người dùng đã đăng nhập mới có thể xóa ảnh khách sạn
+    permission_classes = [IsAuthenticated]
 
     def perform_destroy(self, instance):
-        """
-        Xóa hẳn ảnh khách sạn khỏi cơ sở dữ liệu và hệ thống tệp.
-        """
-        # Lấy đường dẫn tệp ảnh
         image_path = instance.image
-
-        # Nếu đường dẫn ảnh bắt đầu với "/media", ta loại bỏ nó để tránh trùng lặp
         if image_path.startswith("/media"):
             image_path = image_path.lstrip("/media")
-
-        full_image_path = os.path.join(settings.MEDIA_ROOT, image_path.lstrip("/"))
-
-        # Xóa ảnh khỏi hệ thống tệp (nếu tệp tồn tại)
-        if os.path.exists(full_image_path):
-            os.remove(full_image_path)
-
-        instance.delete()  # Xóa ảnh khách sạn khỏi cơ sở dữ liệu
-
-        return Response(
-            {
-                "isSuccess": True,
-                "message": "HotelImage deleted successfully",
-                "data": {},
-            },
-            status=200,  # Trả về mã HTTP 200 khi xóa thành công
-        )
+        full_path = os.path.join(settings.MEDIA_ROOT, image_path.lstrip("/"))
+        if os.path.exists(full_path):
+            os.remove(full_path)
+        instance.delete()
+        return Response({
+            "isSuccess": True,
+            "message": "HotelImage deleted successfully",
+            "data": {},
+        }, status=200)
