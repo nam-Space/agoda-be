@@ -119,7 +119,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "agoda",  # Tên cơ sở dữ liệu MySQL
         "USER": "root",  # Tên người dùng MySQL
-        "PASSWORD": "",  # Mật khẩu người dùng MySQL
+        "PASSWORD": "2607",  # Mật khẩu người dùng MySQL
         "HOST": "localhost",
         "PORT": "3306",
     },
