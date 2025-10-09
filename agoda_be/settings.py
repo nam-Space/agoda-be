@@ -55,6 +55,8 @@ INSTALLED_APPS = [
     "cars",
     "promotions",
     "activities",
+    "channels",
+    "chats",
     "drf_spectacular",
     "rest_framework_simplejwt.token_blacklist",
 ]
@@ -185,3 +187,16 @@ import os
 # Cấu hình thư mục media
 MEDIA_URL = "/media/"  # URL để truy cập file media
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")  # Đường dẫn trên server để lưu trữ file
+
+
+# Channels settings
+ASGI_APPLICATION = "agoda_be.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],  # Redis chạy ở localhost
+        },
+    },
+}
