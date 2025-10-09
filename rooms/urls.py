@@ -1,17 +1,23 @@
-from django.urls import path, include
-from django.conf import settings
-from django.conf.urls.static import static
-from rest_framework.routers import DefaultRouter
-from .views import RoomViewSet, RoomImageViewSet
-
-router = DefaultRouter()
-router.register(r"rooms", RoomViewSet)
-router.register(r"room-images", RoomImageViewSet)
+# rooms/urls.py
+from django.urls import path
+from .views import (
+    RoomListView,
+    RoomCreateView,
+    RoomDetailView,
+    RoomUpdateView,
+    RoomDeleteView,
+    RoomImageDeleteView,
+)
 
 urlpatterns = [
-    path("", include(router.urls)),
+    path("rooms/", RoomListView.as_view(), name="room-list"),
+    path("rooms/create/", RoomCreateView.as_view(), name="room-create"),
+    path("rooms/<int:pk>/", RoomDetailView.as_view(), name="room-detail"),
+    path("rooms/<int:pk>/update/", RoomUpdateView.as_view(), name="room-update"),
+    path("rooms/<int:pk>/delete/", RoomDeleteView.as_view(), name="room-delete"),
+    path(
+        "room-images/<int:pk>/delete/",
+        RoomImageDeleteView.as_view(),
+        name="room-image-delete",
+    ),
 ]
-
-# Thêm vào để phục vụ các file media trong quá trình phát triển
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
