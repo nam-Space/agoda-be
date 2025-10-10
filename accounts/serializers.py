@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
+# from hotels.serializers import HotelSerializer
+
 
 # Serializer cho việc đăng ký người dùng mới
 class RegisterSerializer(serializers.ModelSerializer):
@@ -76,6 +78,8 @@ class CreateUserSerializer(serializers.ModelSerializer):
 
 # Serializer cho thông tin người dùng
 class UserSerializer(serializers.ModelSerializer):
+    hotel = serializers.SerializerMethodField()
+
     class Meta:
         model = get_user_model()
         fields = [
@@ -91,8 +95,17 @@ class UserSerializer(serializers.ModelSerializer):
             "avatar",
             "is_active",
             "date_joined",
+            "hotel",
         ]
         extra_kwargs = {"birthday": {"required": False}}
+
+    def get_hotel(self, obj):
+        # import lazy để tránh circular import
+        from hotels.serializers import HotelSimpleSerializer
+
+        if hasattr(obj, "hotel") and obj.hotel:
+            return HotelSimpleSerializer(obj.hotel).data
+        return None
 
 
 # Serializer cho thông tin người dùng (có mật khẩu)

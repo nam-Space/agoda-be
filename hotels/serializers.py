@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import Hotel, HotelImage
 from cities.models import City
 from cities.serializers import CityCreateSerializer
+from accounts.serializers import UserSerializer
+from accounts.models import CustomUser
 
 
 class HotelImageSerializer(serializers.ModelSerializer):
@@ -13,9 +15,19 @@ class HotelImageSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class HotelSimpleSerializer(serializers.ModelSerializer):
+    images = HotelImageSerializer(many=True, read_only=True)
+    city = CityCreateSerializer(read_only=True)
+
+    class Meta:
+        model = Hotel
+        fields = "__all__"
+
+
 class HotelSerializer(serializers.ModelSerializer):
     images = HotelImageSerializer(many=True, read_only=True)
     city = CityCreateSerializer(read_only=True)
+    owner = UserSerializer(read_only=True)
     city_id = serializers.IntegerField(source="city.id", read_only=True)
 
     class Meta:
@@ -26,11 +38,13 @@ class HotelSerializer(serializers.ModelSerializer):
 class HotelCreateSerializer(serializers.ModelSerializer):
     # Sử dụng PrimaryKeyRelatedField để nhận ID của thành phố
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all())
+    owner = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
 
     class Meta:
         model = Hotel
         fields = [
             "city",
+            "owner",
             "name",
             "description",
             "lat",
