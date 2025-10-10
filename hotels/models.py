@@ -6,6 +6,13 @@ class Hotel(models.Model):
     city = models.ForeignKey(
         City, on_delete=models.CASCADE, related_name="hotels", null=True
     )
+    owner = models.OneToOneField(  # 🔹 Liên kết 1-0 với CustomUser
+        "accounts.CustomUser",
+        on_delete=models.SET_NULL,  # Nếu user bị xóa, giữ hotel lại
+        related_name="hotel",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     lat = models.FloatField(null=True, blank=True)
