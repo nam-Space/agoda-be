@@ -112,7 +112,7 @@ class CarCreateView(generics.CreateAPIView):
     queryset = Car.objects.all()
     serializer_class = CarCreateSerializer
     permission_classes = [
-        IsAuthenticated
+        # IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể tạo xe
 
     def create(self, request, *args, **kwargs):

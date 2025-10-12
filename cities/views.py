@@ -10,7 +10,8 @@ import math
 from django.core.paginator import Paginator
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Count
-from bookings.models import BookingStatus
+from bookings.models import Booking
+from bookings.constants.booking_status import BookingStatus
 from rest_framework import status
 
 
@@ -210,9 +211,9 @@ class TopVietnamCitiesView(APIView):
             City.objects.filter(vietnam_filter)
             .annotate(
                 booking_count=Count(
-                    "hotels__rooms__bookings",
+                    "hotels__rooms__room_bookings__booking",
                     filter=Q(
-                        hotels__rooms__bookings__status__in=[
+                        hotels__rooms__room_bookings__booking__status__in=[
                             BookingStatus.CONFIRMED,
                             BookingStatus.COMPLETED,
                         ]
@@ -264,9 +265,9 @@ class TopAbroadCitiesView(APIView):
             City.objects.exclude(vietnam_filter)
             .annotate(
                 booking_count=Count(
-                    "hotels__rooms__bookings",
+                    "hotels__rooms__room_bookings__booking",
                     filter=Q(
-                        hotels__rooms__bookings__status__in=[
+                        hotels__rooms__room_bookings__booking__status__in=[
                             BookingStatus.CONFIRMED,
                             BookingStatus.COMPLETED,
                         ]

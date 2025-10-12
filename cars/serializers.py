@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Car
+from .models import Car, CarBookingDetail
 from accounts.serializers import UserSerializer
 from accounts.models import CustomUser
 
@@ -14,12 +14,13 @@ class CarSerializer(serializers.ModelSerializer):
 
 class CarCreateSerializer(serializers.ModelSerializer):
     # Sử dụng PrimaryKeyRelatedField để nhận ID của người dùng
-    user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
+    # user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
 
     class Meta:
         model = Car
         fields = [
-            "user",
+            "id",
+            # "user",
             "name",
             "description",
             "capacity",
@@ -30,3 +31,16 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "avg_speed",
             "image",
         ]  # Chỉ có những trường cần thiết
+
+class CarBookingDetailSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = CarBookingDetail
+        fields = [
+            "car",
+            "pickup_location",
+            "dropoff_location",
+            "pickup_datetime",
+            "driver_required",
+            "distance_km",
+        ]
