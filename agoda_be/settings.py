@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from datetime import timedelta
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -55,6 +56,7 @@ INSTALLED_APPS = [
     "cars",
     "promotions",
     "activities",
+    "flights",
     "channels",
     "chats",
     "drf_spectacular",
@@ -62,7 +64,7 @@ INSTALLED_APPS = [
 ]
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=2),  # Thời gian sống của access token
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),  # Thời gian sống của access token
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),  # Thời gian sống của refresh token
     "ROTATE_REFRESH_TOKENS": True,  # Cấp refresh token mới sau mỗi lần refresh
     "BLACKLIST_AFTER_ROTATION": True,  # Blacklist refresh token cũ
@@ -119,7 +121,7 @@ WSGI_APPLICATION = "agoda_be.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "agoda",  # Tên cơ sở dữ liệu MySQL
+        "NAME": "agoda2",  # Tên cơ sở dữ liệu MySQL
         "USER": "root",  # Tên người dùng MySQL
         "PASSWORD": "",  # Mật khẩu người dùng MySQL
         "HOST": "localhost",
@@ -204,3 +206,16 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Cấu hình email
+EMAIL_BACKEND = config("EMAIL_BACKEND")
+EMAIL_HOST = config("EMAIL_HOST")
+EMAIL_PORT = config("EMAIL_PORT", cast=int)
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=bool)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+
+# Cấu hình Stripe
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET")
+STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY")
