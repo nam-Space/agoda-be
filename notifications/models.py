@@ -1,9 +1,13 @@
 from django.db import models
 from django.conf import settings
 from django.core.mail import send_mail
+from accounts.models import CustomUser
+
 
 class Notification(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        CustomUser, null=True, blank=True, on_delete=models.CASCADE
+    )
     email = models.EmailField(null=True, blank=True)  # email trực tiếp
     title = models.CharField(max_length=255)
     message = models.TextField()

@@ -5,7 +5,7 @@ from accounts.models import CustomUser
 
 
 class CarSerializer(serializers.ModelSerializer):
-    user = UserSerializer()
+    user = UserSerializer()  # tài xế
 
     class Meta:
         model = Car
@@ -13,14 +13,14 @@ class CarSerializer(serializers.ModelSerializer):
 
 
 class CarCreateSerializer(serializers.ModelSerializer):
-    # Sử dụng PrimaryKeyRelatedField để nhận ID của người dùng
-    # user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
+    # Sử dụng PrimaryKeyRelatedField để nhận ID của tài xế
+    user = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
 
     class Meta:
         model = Car
         fields = [
             "id",
-            # "user",
+            "user",
             "name",
             "description",
             "capacity",
@@ -31,6 +31,7 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "avg_speed",
             "image",
         ]  # Chỉ có những trường cần thiết
+
 
 class CarBookingDetailSerializer(serializers.ModelSerializer):
 

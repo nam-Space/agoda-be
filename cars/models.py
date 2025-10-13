@@ -2,8 +2,15 @@ from django.db import models
 from accounts.models import CustomUser
 from bookings.models import Booking
 
+
 class Car(models.Model):
-    # user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="cars")
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="cars",
+        null=True,
+        blank=True,
+    )  # tài xế
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
     capacity = models.PositiveIntegerField()  # số chỗ ngồi
@@ -24,13 +31,15 @@ class Car(models.Model):
 
 
 class CarBookingDetail(models.Model):
-    booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='car_detail')
-    car = models.ForeignKey(Car, on_delete=models.CASCADE)  
+    booking = models.OneToOneField(
+        Booking, on_delete=models.CASCADE, related_name="car_detail"
+    )
+    car = models.ForeignKey(Car, on_delete=models.CASCADE)
     pickup_location = models.CharField(max_length=255)
     dropoff_location = models.CharField(max_length=255)
     pickup_datetime = models.DateTimeField()
     driver_required = models.BooleanField(default=False)
-    distance_km = models.FloatField(default=0.0) 
-    
+    distance_km = models.FloatField(default=0.0)
+
     def __str__(self):
         return f"CarBooking for {self.booking.booking_code}"
