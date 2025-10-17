@@ -1,6 +1,7 @@
 # activities/models.py
 from django.db import models
 from cities.models import City  # Liên kết với model Country
+from bookings.models import Booking
 
 
 # Model hoạt động
@@ -76,3 +77,28 @@ class ActivityDate(models.Model):
 
     def __str__(self):
         return f"{self.name}, {self.activity_package.name}"
+
+
+class ActivityDateBookingDetail(models.Model):
+    booking = models.OneToOneField(
+        Booking, on_delete=models.CASCADE, related_name="activity_date_detail"
+    )
+    activity_date = models.ForeignKey(
+        ActivityDate, on_delete=models.CASCADE, related_name="activities_dates"
+    )
+    price_adult = models.FloatField(default=0.0)
+    price_child = models.FloatField(default=0.0)
+    adult_quantity_booking = models.PositiveIntegerField(default=1)
+    child_quantity_booking = models.PositiveIntegerField(default=1)
+    date_launch = models.DateTimeField()
+    activity_package_name = models.CharField(max_length=255, null=True, blank=True)
+    activity_name = models.CharField(max_length=255, null=True, blank=True)
+    activity_image = models.CharField(max_length=255, null=True, blank=True)
+    avg_price = models.FloatField(default=0.0)
+    avg_star = models.FloatField(default=0.0)
+    city_name = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.city_name}, {self.activity_package_name}"

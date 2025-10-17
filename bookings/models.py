@@ -9,7 +9,7 @@ from accounts.models import CustomUser
 
 class Booking(models.Model):
     service_type = models.PositiveSmallIntegerField(choices=ServiceType.choices)
-    service_ref_id = models.IntegerField()
+    service_ref_id = models.IntegerField(null=True, blank=True)
     user = models.ForeignKey(
         CustomUser, null=True, blank=True, on_delete=models.SET_NULL
     )
