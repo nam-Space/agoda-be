@@ -1,5 +1,6 @@
 from django.db import models
 from cities.models import City
+from django.db.models import Avg
 
 
 class Hotel(models.Model):
@@ -31,9 +32,22 @@ class Hotel(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    min_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=0)
 
     def __str__(self):
         return self.name
+    
+    # ✅ Hàm tự cập nhật giá trung bình của các phòng còn available
+    def update_min_price(self):
+        from rooms.models import Room
+        avg_price = (
+            Room.objects.filter(hotel=self, available=True)
+            .aggregate(avg_price=models.Avg("price_per_night"))
+            .get("avg_price")
+        )
+        self.min_price = avg_price or 0
+        self.save(update_fields=["min_price"])
 
 
 # Model để lưu thông tin về hình ảnh khách sạn

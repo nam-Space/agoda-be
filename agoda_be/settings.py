@@ -61,6 +61,12 @@ INSTALLED_APPS = [
     "chats",
     "drf_spectacular",
     "rest_framework_simplejwt.token_blacklist",
+    "neighborhood",
+    "quick_info",
+    "faqs",
+    "travel_tips",
+    "accommodationtype",
+    "travelguide",
 ]
 
 SIMPLE_JWT = {
@@ -121,7 +127,7 @@ WSGI_APPLICATION = "agoda_be.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "agoda2",  # Tên cơ sở dữ liệu MySQL
+        "NAME": "agoda3",  # Tên cơ sở dữ liệu MySQL
         "USER": "root",  # Tên người dùng MySQL
         "PASSWORD": "",  # Mật khẩu người dùng MySQL
         "HOST": "localhost",
