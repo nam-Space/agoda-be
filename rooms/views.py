@@ -305,7 +305,10 @@ class RoomDetailView(generics.RetrieveAPIView):
             serializer = self.get_serializer(instance)
             data = serializer.data
             data["images"] = RoomImageSerializer(instance.room_images, many=True).data
-            return Response({"message": "Chi tiết phòng", "data": data}, status=200)
+            return Response(
+                {"isSuccess": True, "message": "Chi tiết phòng", "data": data},
+                status=200,
+            )
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
