@@ -7,6 +7,9 @@ from .views import (
     RoomUpdateView,
     RoomDeleteView,
     RoomImageDeleteView,
+    RoomAmenityListView,
+    RoomSearchView,
+
 )
 
 urlpatterns = [
@@ -20,4 +23,10 @@ urlpatterns = [
         RoomImageDeleteView.as_view(),
         name="room-image-delete",
     ),
+    path(
+        "rooms/<int:room_id>/amenities/",
+        RoomAmenityListView.as_view(),
+        name="room-amenities",
+    ),
+    path("rooms/search/", RoomSearchView.as_view(), name="room-search"),
 ]

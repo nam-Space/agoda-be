@@ -190,3 +190,71 @@ class HotelImageDeleteView(generics.DestroyAPIView):
             },
             status=200,
         )
+
+# -------------------- Hotel List by City --------------------
+class HotelByCityView(generics.ListAPIView):
+    serializer_class = HotelSerializer
+    pagination_class = HotelPagination
+    authentication_classes = []  # không yêu cầu đăng nhập
+    permission_classes = []  # không giới hạn quyền truy cập
+
+    def get_queryset(self):
+        city_id = self.kwargs.get("city_id")
+        if not city_id:
+            return Hotel.objects.none()
+
+        try:
+            city_id = int(city_id)
+        except ValueError:
+            return Hotel.objects.none()
+
+        return Hotel.objects.filter(city_id=city_id).order_by("-id")
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+
+from rest_framework.generics import ListAPIView
+from .models import Hotel
+from .serializers import HotelSearchSerializer
+
+
+class HotelSearchPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "limit"
+    max_page_size = 50
+
+
+class HotelSearchView(ListAPIView):
+    serializer_class = HotelSearchSerializer
+    pagination_class = HotelSearchPagination
+
+    def get_queryset(self):
+        queryset = Hotel.objects.all()
+        hotel_name = self.request.query_params.get("hotel_name")
+
+        if hotel_name:
+            queryset = queryset.filter(name__icontains=hotel_name)
+
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(
+            {
+                "isSuccess": True,
+                "message": "Fetched hotels successfully!",
+                "meta": {
+                    "totalItems": self.paginator.page.paginator.count,
+                    "currentPage": self.paginator.page.number,
+                    "itemsPerPage": self.paginator.get_page_size(request),
+                    "totalPages": self.paginator.page.paginator.num_pages,
+                },
+                "data": serializer.data,
+            }
+        )

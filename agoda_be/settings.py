@@ -61,6 +61,12 @@ INSTALLED_APPS = [
     "chats",
     "drf_spectacular",
     "rest_framework_simplejwt.token_blacklist",
+    "neighborhood",
+    "quick_info",
+    "faqs",
+    "travel_tips",
+    "accommodationtype",
+    "travelguide",
 ]
 
 SIMPLE_JWT = {

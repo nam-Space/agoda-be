@@ -7,6 +7,8 @@ from .views import (
     HotelUpdateView,
     HotelDeleteView,
     HotelImageDeleteView,
+    HotelByCityView,
+    HotelSearchView,
 )
 
 urlpatterns = [
@@ -30,4 +32,8 @@ urlpatterns = [
         HotelImageDeleteView.as_view(),
         name="hotel-image-delete",
     ),  # DELETE xóa ảnh khách sạn
+    path("by-city/<int:city_id>/", HotelByCityView.as_view(), name="hotel-by-city"),
+    path(
+        "search/", HotelSearchView.as_view(), name="hotel-search"
+    ),  # Tìm kiếm khách sạn
 ]
