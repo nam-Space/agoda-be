@@ -1,7 +1,13 @@
 # activities/views.py
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from .models import Activity, ActivityImage, ActivityPackage, ActivityDate
+from .models import (
+    Activity,
+    ActivityImage,
+    ActivityPackage,
+    ActivityDate,
+    ActivityDateBookingDetail,
+)
 from .serializers import (
     ActivitySerializer,
     ActivityDetailSerializer,
@@ -11,6 +17,8 @@ from .serializers import (
     ActivityPackageCreateSerializer,
     ActivityDateSerializer,
     ActivityDateCreateSerializer,
+    ActivityDateBookingDetailSerializer,
+    ActivityDateBookingCreateSerializer,
 )
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
@@ -762,4 +770,61 @@ class ActivityDateBulkDeleteView(APIView):
                 "data": {"deleted_ids": ids},
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class ActivityDateBookingDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = ActivityDateBookingDetail.objects.all()
+    serializer_class = ActivityDateBookingDetailSerializer
+    authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
+    permission_classes = []  # Không cần kiểm tra quyền
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override phương thức `retrieve` để trả về response chuẩn cho việc lấy thông tin chi tiết activity.
+        """
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Activity details fetched successfully",
+                "data": serializer.data,  # Dữ liệu activity
+            }
+        )
+
+
+class ActivityDateBookingCreateView(generics.CreateAPIView):
+    queryset = ActivityDateBookingDetail.objects.all()
+    serializer_class = ActivityDateBookingCreateSerializer
+    authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
+    permission_classes = []  # Không cần kiểm tra quyền
+
+    def create(self, request, *args, **kwargs):
+        # Lấy dữ liệu từ request
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            # Lưu activity date booking mới
+            activity_date_booking = serializer.save()
+
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "Activity date booking created successfully",
+                    "data": ActivityDateBookingCreateSerializer(
+                        activity_date_booking
+                    ).data,
+                },
+                status=200,
+            )
+
+        return Response(
+            {
+                "isSuccess": False,
+                "message": "Failed to create activity date booking",
+                "data": serializer.errors,
+            },
+            status=400,
         )

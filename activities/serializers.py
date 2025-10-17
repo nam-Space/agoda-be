@@ -1,5 +1,11 @@
 from rest_framework import serializers
-from .models import Activity, ActivityImage, ActivityPackage, ActivityDate
+from .models import (
+    Activity,
+    ActivityImage,
+    ActivityPackage,
+    ActivityDate,
+    ActivityDateBookingDetail,
+)
 from cities.models import City
 from cities.serializers import CityCreateSerializer
 
@@ -115,6 +121,59 @@ class ActivityDateCreateSerializer(serializers.ModelSerializer):
             "adult_quantity",
             "child_quantity",
             "date_launch",
+            "created_at",
+            "updated_at",
+        ]  # Chỉ có những trường cần thiết
+
+
+class ActivityDateBookingDetailSerializer(serializers.ModelSerializer):
+    # Sử dụng PrimaryKeyRelatedField để nhận ID của activity package
+    activity_date = serializers.PrimaryKeyRelatedField(
+        queryset=ActivityDate.objects.all()
+    )
+
+    class Meta:
+        model = ActivityDateBookingDetail
+        fields = [
+            "id",
+            "activity_date",
+            "price_adult",
+            "price_child",
+            "adult_quantity_booking",
+            "child_quantity_booking",
+            "date_launch",
+            "activity_package_name",
+            "activity_name",
+            "activity_image",
+            "avg_price",
+            "avg_star",
+            "city_name",
+            "created_at",
+            "updated_at",
+        ]  # Chỉ có những trường cần thiết
+
+
+class ActivityDateBookingCreateSerializer(serializers.ModelSerializer):
+    # Sử dụng PrimaryKeyRelatedField để nhận ID của activity package
+    activity_date = serializers.PrimaryKeyRelatedField(
+        queryset=ActivityDate.objects.all()
+    )
+
+    class Meta:
+        model = ActivityDateBookingDetail
+        fields = [
+            "activity_date",
+            "price_adult",
+            "price_child",
+            "adult_quantity_booking",
+            "child_quantity_booking",
+            "date_launch",
+            "activity_package_name",
+            "activity_name",
+            "activity_image",
+            "avg_price",
+            "avg_star",
+            "city_name",
             "created_at",
             "updated_at",
         ]  # Chỉ có những trường cần thiết

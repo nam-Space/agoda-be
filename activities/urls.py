@@ -20,6 +20,8 @@ from .views import (
     ActivityDateDeleteView,
     ActivityDateBulkCreateView,
     ActivityDateBulkDeleteView,
+    ActivityDateBookingDetailView,
+    ActivityDateBookingCreateView,
 )
 
 urlpatterns = [
@@ -111,5 +113,15 @@ urlpatterns = [
         "activities-dates/bulk-delete/",
         ActivityDateBulkDeleteView.as_view(),
         name="activity-date-bulk-delete",
+    ),
+    path(
+        "activities-dates-booking/<int:pk>/",
+        ActivityDateBookingDetailView.as_view(),
+        name="activity-date-booking-detail",
+    ),
+    path(
+        "activities-dates-booking/create/",
+        ActivityDateBookingCreateView.as_view(),
+        name="activity-dates-booking-create",
     ),
 ]
