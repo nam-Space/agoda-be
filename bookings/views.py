@@ -6,7 +6,10 @@ from .models import Booking
 from .serializers import BookingSerializer
 from django.db.models import Q
 from rooms.serializers import RoomBookingDetailSerializer
-from cars.serializers import CarBookingDetailSerializer
+from cars.serializers import (
+    CarBookingDetailSerializer,
+    CarBookingDetailCreateSerializer,
+)
 from flights.serializers import FlightBookingDetailSerializer
 from activities.serializers import ActivityDateBookingDetailSerializer
 from .constants.service_type import ServiceType
@@ -56,7 +59,9 @@ class BookingViewSet(viewsets.ModelViewSet):
 
             detail = CarBookingDetail.objects.filter(booking=booking).first()
             if detail:
-                data = CarBookingDetailSerializer(detail).data
+                data = CarBookingDetailCreateSerializer(detail).data
+                booking.service_ref_id = detail.id
+                booking.save(update_fields=["service_ref_id"])
 
         elif service_type == ServiceType.FLIGHT:
 

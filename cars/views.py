@@ -1,8 +1,8 @@
 # cars/views.py
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from .models import Car
-from .serializers import CarSerializer, CarCreateSerializer
+from .models import Car, CarBookingDetail
+from .serializers import CarSerializer, CarCreateSerializer, CarBookingDetailSerializer
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from rest_framework.response import Response
@@ -188,4 +188,26 @@ class CarDeleteView(generics.DestroyAPIView):
                 "data": {},
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class CarBookingDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = CarBookingDetail.objects.all()
+    serializer_class = CarBookingDetailSerializer
+    authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
+    permission_classes = []  # Không cần kiểm tra quyền
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override phương thức `retrieve` để trả về response chuẩn cho việc lấy thông tin chi tiết xe.
+        """
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Car booking details fetched successfully",
+                "data": serializer.data,  # Dữ liệu xe đặt
+            }
         )

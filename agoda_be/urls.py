@@ -48,6 +48,7 @@ urlpatterns = [
     path("api/travel-tips/", include("travel_tips.urls")),
     path("api/accommodation-types/", include("accommodationtype.urls")),
     path("api/travel-guides/", include("travelguide.urls")),
+    path("api/reviews/", include("reviews.urls")),
     # Schema & Swagger UI
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
