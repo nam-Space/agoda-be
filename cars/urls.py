@@ -6,6 +6,7 @@ from .views import (
     CarCreateView,
     CarUpdateView,
     CarDeleteView,
+    CarBookingDetailView,
 )
 
 urlpatterns = [
@@ -20,4 +21,9 @@ urlpatterns = [
     path(
         "cars/<int:pk>/delete/", CarDeleteView.as_view(), name="car-delete"
     ),  # DELETE xóa xe
+    path(
+        "cars-booking/<int:pk>/",
+        CarBookingDetailView.as_view(),
+        name="car-booking-detail",
+    ),
 ]

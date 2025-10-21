@@ -1,24 +1,33 @@
 from django.db import models
 from django.conf import settings
+from bookings.models import ServiceType  # import lại từ chỗ khai báo ServiceType
+from accounts.models import CustomUser
+
 
 class Review(models.Model):
-    hotel = models.ForeignKey(
-        'hotels.Hotel',
-        on_delete=models.CASCADE,
-        related_name='reviews'
-    )
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='reviews'
+        CustomUser, on_delete=models.CASCADE, related_name="reviews"
     )
-    rating = models.PositiveSmallIntegerField()  # 1-5
-    comment = models.TextField(blank=True)
+    service_type = models.IntegerField(choices=ServiceType.choices)
+    service_ref_id = (
+        models.IntegerField()
+    )  # ID của dịch vụ cụ thể (Hotel, Car, Activity, ...)
+    rating = models.PositiveSmallIntegerField()  # thường là 1–5 sao
+    comment = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('hotel', 'user')  # 1 user chỉ review 1 lần/khách sạn
-        ordering = ['-created_at']
+        db_table = "review"
+        unique_together = (
+            "user",
+            "service_type",
+            "service_ref_id",
+        )  # 1 user chỉ được review 1 lần trên 1 dịch vụ
 
     def __str__(self):
-        return f"{self.user} - {self.hotel} ({self.rating})"
+        return f"Review({self.user}) - {ServiceType(self.service_type).label} #{self.service_ref_id}"
+
+    @property
+    def service_type_name(self):
+        """Trả về tên hiển thị (label) của service_type"""
+        return ServiceType(self.service_type).label

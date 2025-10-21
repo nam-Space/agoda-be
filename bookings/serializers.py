@@ -2,7 +2,10 @@
 from rest_framework import serializers
 from .models import Booking, GuestInfo
 from rooms.serializers import RoomBookingDetailSerializer
-from cars.serializers import CarBookingDetailSerializer
+from cars.serializers import (
+    CarBookingDetailSerializer,
+    CarBookingDetailCreateSerializer,
+)
 from flights.serializers import FlightBookingDetailSerializer
 from activities.serializers import ActivityDateBookingDetailSerializer
 from rooms.models import RoomBookingDetail
@@ -24,7 +27,7 @@ class BookingSerializer(serializers.ModelSerializer):
     )  # 👈 Thêm dòng này
     guest_info = GuestInfoSerializer(required=False)
     hotel_detail = RoomBookingDetailSerializer(required=False)
-    car_detail = CarBookingDetailSerializer(required=False)
+    car_detail = CarBookingDetailCreateSerializer(required=False)
     flight_detail = FlightBookingDetailSerializer(required=False)
     activity_detail = ActivityDateBookingDetailSerializer(required=False)
 

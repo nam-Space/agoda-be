@@ -84,7 +84,7 @@ class ActivityDateBookingDetail(models.Model):
         Booking, on_delete=models.CASCADE, related_name="activity_date_detail"
     )
     activity_date = models.ForeignKey(
-        ActivityDate, on_delete=models.CASCADE, related_name="activities_dates"
+        ActivityDate, on_delete=models.CASCADE, related_name="activities_dates_bookings"
     )
     price_adult = models.FloatField(default=0.0)
     price_child = models.FloatField(default=0.0)
