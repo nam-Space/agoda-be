@@ -9,3 +9,8 @@ channels==3.0.5
 channels-redis==3.3.1
 stripe==13.0.1
 python-decouple==3.8
+
+# lưu ý thêm là cài CUDA developer ở link https://developer.nvidia.com/cuda-downloads
+# Sau đó cài CUDA version 13.0 ở link https://pytorch.org/get-started/locally
+# Cuối cùng gõ lệnh `pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu130`
+transformers==4.51.3 
