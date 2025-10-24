@@ -29,6 +29,7 @@ class Activity(models.Model):
     )  # Trường departure_information mới
     avg_price = models.FloatField(default=0.0)
     avg_star = models.FloatField(default=0.0)
+    review_count = models.PositiveIntegerField(default=0)
     total_time = models.PositiveIntegerField()  # số giờ hoạt động
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

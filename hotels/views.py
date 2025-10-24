@@ -191,6 +191,7 @@ class HotelImageDeleteView(generics.DestroyAPIView):
             status=200,
         )
 
+
 # -------------------- Hotel List by City --------------------
 class HotelByCityView(generics.ListAPIView):
     serializer_class = HotelSerializer
@@ -208,7 +209,9 @@ class HotelByCityView(generics.ListAPIView):
         except ValueError:
             return Hotel.objects.none()
 
-        return Hotel.objects.filter(city_id=city_id).order_by("-id")
+        return Hotel.objects.filter(city_id=city_id).order_by(
+            "-avg_star", "-created_at"
+        )
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()

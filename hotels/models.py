@@ -29,18 +29,22 @@ class Hotel(models.Model):
     locationInfo = models.TextField(null=True, blank=True)
     regulation = models.TextField(blank=True)
     avg_star = models.FloatField(default=0.0)
+    review_count = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    min_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=0)
+
+    min_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, default=0
+    )
 
     def __str__(self):
         return self.name
-    
+
     # ✅ Hàm tự cập nhật giá trung bình của các phòng còn available
     def update_min_price(self):
         from rooms.models import Room
+
         avg_price = (
             Room.objects.filter(hotel=self, available=True)
             .aggregate(avg_price=models.Avg("price_per_night"))
