@@ -7,6 +7,7 @@ from .models import (
     ActivityPackage,
     ActivityDate,
     ActivityDateBookingDetail,
+    UserActivityInteraction,
 )
 from .serializers import (
     ActivitySerializer,
@@ -19,6 +20,8 @@ from .serializers import (
     ActivityDateCreateSerializer,
     ActivityDateBookingDetailSerializer,
     ActivityDateBookingCreateSerializer,
+    UserActivityInteractionSerializer,
+    UserActivityInteractionCreateSerializer,
 )
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
@@ -30,6 +33,12 @@ import os
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework import status
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.db.models.functions import Coalesce
+from django.db.models import Q, OuterRef, Subquery, Value
+from django.db.models import F, FloatField, ExpressionWrapper, functions as Func
+from rest_framework.exceptions import AuthenticationFailed, ValidationError, NotFound
+from django.db.models import Sum
 
 
 # Phân trang
@@ -48,9 +57,59 @@ class ActivityPagination(PageNumberPagination):
             self.filters["city_id"] = city_id
 
         for field, value in request.query_params.items():
-            if field not in ["current", "pageSize", "city_id"]:
+            if field not in [
+                "current",
+                "pageSize",
+                "city_id",
+                "recommended",
+                "avg_star",
+                "min_avg_price",
+                "max_avg_price",
+                "sort",
+                "min_total_time",
+                "max_total_time",
+            ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
+            elif field in ["avg_star"]:
+                try:
+                    int_value = int(value)
+                    self.filters["avg_star__gte"] = int_value
+                    self.filters["avg_star__lt"] = int_value + 1
+                except ValueError:
+                    pass
+
+            elif field in ["min_avg_price", "max_avg_price"]:
+                min_avg_price = request.query_params.get("min_avg_price")
+                max_avg_price = request.query_params.get("max_avg_price")
+
+                if min_avg_price:
+                    try:
+                        self.filters["avg_price__gte"] = float(min_avg_price)
+                    except ValueError:
+                        pass
+
+                if max_avg_price:
+                    try:
+                        self.filters["avg_price__lte"] = float(max_avg_price)
+                    except ValueError:
+                        pass
+
+            elif field in ["min_total_time", "max_total_time"]:
+                min_total_time = request.query_params.get("min_total_time")
+                max_total_time = request.query_params.get("max_total_time")
+
+                if min_total_time:
+                    try:
+                        self.filters["total_time__gte"] = float(min_total_time)
+                    except ValueError:
+                        pass
+
+                if max_total_time:
+                    try:
+                        self.filters["total_time__lte"] = float(max_total_time)
+                    except ValueError:
+                        pass
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
         try:
@@ -94,12 +153,13 @@ class ActivityListView(generics.ListAPIView):
     queryset = Activity.objects.all()
     serializer_class = ActivitySerializer
     pagination_class = ActivityPagination
-    authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
+    authentication_classes = [JWTAuthentication]  # Bỏ qua tất cả các lớp xác thực
     permission_classes = []  # Không cần kiểm tra quyền
     filter_backends = [DjangoFilterBackend]
 
     def get_queryset(self):
         queryset = Activity.objects.all()
+        user = self.request.user
 
         # Lọc dữ liệu theo query params
         filter_params = self.request.query_params
@@ -115,25 +175,100 @@ class ActivityListView(generics.ListAPIView):
                 "pageSize",
                 "current",
                 "city_id",
+                "recommended",
+                "avg_star",
+                "min_avg_price",
+                "max_avg_price",
+                "sort",
+                "min_total_time",
+                "max_total_time",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
+            elif field in ["avg_star"]:
+                try:
+                    int_value = int(value)
+                    query_filter &= Q(**{f"{field}__gte": int_value}) & Q(
+                        **{f"{field}__lt": int_value + 1}
+                    )
+                except ValueError:
+                    pass  # bỏ qua nếu không phải số hợp lệ
+
+            elif field in ["min_avg_price", "max_avg_price"]:
+                min_avg_price = filter_params.get("min_avg_price")
+                max_avg_price = filter_params.get("max_avg_price")
+
+                if min_avg_price:
+                    try:
+                        query_filter &= Q(avg_price__gte=float(min_avg_price))
+                    except ValueError:
+                        pass
+
+                if max_avg_price:
+                    try:
+                        query_filter &= Q(avg_price__lte=float(max_avg_price))
+                    except ValueError:
+                        pass
+
+            elif field in ["min_total_time", "max_total_time"]:
+                min_total_time = filter_params.get("min_total_time")
+                max_total_time = filter_params.get("max_total_time")
+
+                if min_total_time:
+                    try:
+                        query_filter &= Q(total_time__gte=float(min_total_time))
+                    except ValueError:
+                        pass
+
+                if max_total_time:
+                    try:
+                        query_filter &= Q(total_time__lte=float(max_total_time))
+                    except ValueError:
+                        pass
+
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
+        sort_params = filter_params.get("sort")
+        order_fields = []
 
-        # Lấy tham số 'current' từ query string để tính toán trang
-        current = self.request.query_params.get(
-            "current", 1
-        )  # Trang hiện tại, mặc định là trang 1
-        page_size = self.request.query_params.get(
-            "pageSize", 10
-        )  # Số phần tử mỗi trang, mặc định là 10
+        if sort_params:
+            # Ví dụ: sort=avg_price-desc,avg_star-asc
+            sort_list = sort_params.split(",")
+            for sort_item in sort_list:
+                try:
+                    field, direction = sort_item.split("-")
+                    if direction == "desc":
+                        order_fields.append(f"-{field}")
+                    else:
+                        order_fields.append(field)
+                except ValueError:
+                    continue  # bỏ qua format không hợp lệ
 
-        # Áp dụng phân trang
-        paginator = Paginator(queryset, page_size)
-        page = paginator.get_page(current)
+        # Nếu có recommended thì sắp xếp ưu tiên theo weighted_score trước
+        recommended = filter_params.get("recommended")
+        if recommended:
+            if user and user.is_authenticated:
+                user_interaction = UserActivityInteraction.objects.filter(
+                    user=user, activity=OuterRef("pk")
+                ).values("weighted_score")[:1]
 
-        return page
+                queryset = queryset.annotate(
+                    weighted_score_user=Coalesce(
+                        Subquery(user_interaction, output_field=FloatField()),
+                        Value(0.0),
+                    )
+                )
+
+                # Nếu có order_fields thì thêm sau weighted_score_user
+                queryset = queryset.order_by(
+                    "-weighted_score_user", "-total_weighted_score", *order_fields
+                )
+            else:
+                queryset = queryset.order_by("-total_weighted_score", *order_fields)
+        elif order_fields:
+            queryset = queryset.order_by(*order_fields)
+
+        return queryset
 
 
 class ActivityCreateView(generics.CreateAPIView):
@@ -236,6 +371,108 @@ class ActivityUpdateView(generics.UpdateAPIView):
                 "data": serializer.errors,
             },
             status=400,
+        )
+
+
+class UserActivityInteractionDetailView(generics.RetrieveAPIView):
+    serializer_class = UserActivityInteractionSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = []
+
+    def get_object(self):
+        user = self.request.user
+        activity_id = self.kwargs.get("activity_id")
+
+        if not user or not user.is_authenticated:
+            raise AuthenticationFailed("User not authenticated")
+
+        if not activity_id:
+            raise ValidationError("Missing activity_id")
+
+        try:
+            return UserActivityInteraction.objects.get(
+                user=user, activity_id=activity_id
+            )
+        except UserActivityInteraction.DoesNotExist:
+            raise NotFound("UserActivityInteraction not found")
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "UserActivityInteraction details fetched successfully",
+                "data": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class UserActivityInteractionUpsertView(generics.UpdateAPIView):
+    serializer_class = UserActivityInteractionCreateSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = []
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        activity_id = request.data.get("activity_id")
+
+        if not user or not user.is_authenticated:
+            return Response(
+                {"isSuccess": False, "message": "User not authenticated"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not activity_id:
+            return Response(
+                {"isSuccess": False, "message": "Missing activity_id"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        interaction, created = UserActivityInteraction.objects.get_or_create(
+            user=user, activity_id=activity_id
+        )
+
+        # ✅ Cập nhật hành vi
+        interaction.click_count = int(request.data.get("click_count", 0))
+        interaction.positive_count = int(request.data.get("positive_count", 0))
+        interaction.negative_count = int(request.data.get("negative_count", 0))
+        interaction.neutral_count = int(request.data.get("neutral_count", 0))
+
+        # ✅ Cập nhật điểm người dùng
+        interaction.update_weighted_score()
+        interaction.save()
+
+        # ✅ Cập nhật thống kê tổng của khách sạn
+        activity = interaction.activity
+        totals = activity.user_activity_interactions.aggregate(
+            total_click=Sum("click_count"),
+            total_positive=Sum("positive_count"),
+            total_negative=Sum("negative_count"),
+            total_neutral=Sum("neutral_count"),
+        )
+        activity.total_click = totals["total_click"] or 0
+        activity.total_positive = totals["total_positive"] or 0
+        activity.total_negative = totals["total_negative"] or 0
+        activity.total_neutral = totals["total_neutral"] or 0
+
+        activity.save()
+        activity.update_total_weighted_score()
+
+        serializer = self.get_serializer(interaction)
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": (
+                    "Interaction created successfully!"
+                    if created
+                    else "Interaction updated successfully!"
+                ),
+                "data": serializer.data,
+            },
+            status=status.HTTP_200_OK,
         )
 
 
