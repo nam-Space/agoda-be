@@ -12,9 +12,10 @@ from django.core.paginator import Paginator
 from rest_framework import status
 from transformers import pipeline
 from bookings.models import ServiceType
-from hotels.models import Hotel
-from activities.models import Activity
+from hotels.models import Hotel, UserHotelInteraction
+from activities.models import Activity, UserActivityInteraction
 from django.db.models import Avg, Count
+from django.db import transaction
 
 # Khởi tạo mô hình sentiment-analysis chỉ một lần
 _model_path = "5CD-AI/Vietnamese-Sentiment-visobert"
@@ -89,7 +90,7 @@ class ReviewListView(generics.ListAPIView):
     queryset = Review.objects.all().order_by("-created_at")
     serializer_class = ReviewSerializer
     pagination_class = ReviewPagination
-    authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
+    authentication_classes = []  # ✅ cần có để lấy user
     permission_classes = []  # Không cần kiểm tra quyền
     filter_backends = [DjangoFilterBackend]
 
@@ -165,28 +166,103 @@ class ReviewCreateView(generics.CreateAPIView):
             review.confidence = score
             review.save(update_fields=["sentiment", "confidence"])
 
+        # =========================
+        # 🔹 CẬP NHẬT THỐNG KÊ
+        # =========================
         service_type = getattr(review, "service_type", None)
+        service_ref_id = getattr(review, "service_ref_id", None)
 
+        if not service_type or not service_ref_id:
+            return Response(
+                {"isSuccess": False, "message": "Invalid service type or ref id"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Hàm phụ để cập nhật thống kê
+        def update_service_stats(model, type_value):
+            instance = model.objects.filter(id=service_ref_id).first()
+            if not instance:
+                return
+
+            reviews = Review.objects.filter(
+                service_type=type_value, service_ref_id=instance.id
+            )
+
+            # Tổng hợp dữ liệu
+            stats = reviews.aggregate(
+                avg_star=Avg("rating"),
+                review_count=Count("id"),
+                total_positive=Count("id", filter=Q(sentiment="positive")),
+                total_negative=Count("id", filter=Q(sentiment="negative")),
+                total_neutral=Count("id", filter=Q(sentiment="neutral")),
+            )
+
+            # Cập nhật giá trị vào model
+            instance.avg_star = stats["avg_star"] or 0
+            instance.review_count = stats["review_count"] or 0
+            instance.total_positive = stats["total_positive"] or 0
+            instance.total_negative = stats["total_negative"] or 0
+            instance.total_neutral = stats["total_neutral"] or 0
+
+            instance.save(
+                update_fields=[
+                    "avg_star",
+                    "review_count",
+                    "total_positive",
+                    "total_negative",
+                    "total_neutral",
+                ]
+            )
+
+            # ✅ Tự động cập nhật weighted_score
+            instance.update_total_weighted_score()
+            return instance
+
+        # =========================
+        # 🔹 GỌI CẬP NHẬT TƯƠNG ỨNG
+        # =========================
         if service_type == ServiceType.HOTEL:
-            hotel = Hotel.objects.filter(id=review.service_ref_id).first()
+            hotel = update_service_stats(Hotel, ServiceType.HOTEL)
+
+            # ✅ Cập nhật hoặc tạo UserHotelInteraction tương ứng
             if hotel:
-                stats = Review.objects.filter(
-                    service_type=ServiceType.HOTEL, service_ref_id=hotel.id
-                ).aggregate(avg=Avg("rating"), count=Count("id"))
-                hotel.avg_star = stats["avg"] or 0
-                hotel.review_count = stats["count"]
-                hotel.save(update_fields=["avg_star", "review_count"])
+                interaction, _ = UserHotelInteraction.objects.get_or_create(
+                    user=request.user, hotel=hotel
+                )
 
-        elif review.service_type == ServiceType.ACTIVITY:
-            activity = Activity.objects.filter(id=review.service_ref_id).first()
+                if review.sentiment == "positive":
+                    interaction.positive_count += 1
+                elif review.sentiment == "negative":
+                    interaction.negative_count += 1
+                else:
+                    interaction.neutral_count += 1
+
+                # Cập nhật điểm trọng số cá nhân
+                interaction.update_weighted_score()
+                interaction.save()
+        elif service_type == ServiceType.ACTIVITY:
+            activity = update_service_stats(Activity, ServiceType.ACTIVITY)
+
+            # ✅ Cập nhật hoặc tạo UserActivityInteraction tương ứng
             if activity:
-                stats = Review.objects.filter(
-                    service_type=ServiceType.ACTIVITY, service_ref_id=activity.id
-                ).aggregate(avg=Avg("rating"), count=Count("id"))
-                activity.avg_star = stats["avg"] or 0
-                activity.review_count = stats["count"]
-                activity.save(update_fields=["avg_star", "review_count"])
+                interaction, _ = UserActivityInteraction.objects.get_or_create(
+                    user=request.user, activity=activity
+                )
 
+                if review.sentiment == "positive":
+                    interaction.positive_count += 1
+                elif review.sentiment == "negative":
+                    interaction.negative_count += 1
+                else:
+                    interaction.neutral_count += 1
+
+                # Cập nhật điểm trọng số cá nhân
+                interaction.update_weighted_score()
+                interaction.save()
+
+        # =========================
+        # 🔹 TRẢ VỀ KẾT QUẢ
+        # =========================
         return Response(
             {
                 "isSuccess": True,
@@ -226,52 +302,128 @@ class ReviewUpdateView(generics.UpdateAPIView):
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
 
+    # =========================
+    # 🔹 Hàm phụ cập nhật thống kê
+    # =========================
+    def update_service_stats(self, model, type_value, ref_id):
+        instance = model.objects.filter(id=ref_id).first()
+        if not instance:
+            return None
+
+        reviews = Review.objects.filter(service_type=type_value, service_ref_id=ref_id)
+
+        stats = reviews.aggregate(
+            avg_star=Avg("rating"),
+            review_count=Count("id"),
+            total_positive=Count("id", filter=Q(sentiment="positive")),
+            total_negative=Count("id", filter=Q(sentiment="negative")),
+            total_neutral=Count("id", filter=Q(sentiment="neutral")),
+        )
+
+        instance.avg_star = stats["avg_star"] or 0
+        instance.review_count = stats["review_count"] or 0
+        instance.total_positive = stats["total_positive"] or 0
+        instance.total_negative = stats["total_negative"] or 0
+        instance.total_neutral = stats["total_neutral"] or 0
+        instance.save(
+            update_fields=[
+                "avg_star",
+                "review_count",
+                "total_positive",
+                "total_negative",
+                "total_neutral",
+            ]
+        )
+
+        # ✅ Cập nhật điểm trọng số tổng thể
+        instance.update_total_weighted_score()
+        return instance
+
+    # =========================
+    # 🔹 Hàm phụ cập nhật interaction
+    # =========================
+    def update_interaction(self, interaction, sentiment):
+        interaction.positive_count = Review.objects.filter(
+            user=interaction.user,
+            sentiment="positive",
+            service_ref_id=getattr(
+                interaction, "hotel_id", getattr(interaction, "activity_id", None)
+            ),
+        ).count()
+
+        interaction.negative_count = Review.objects.filter(
+            user=interaction.user,
+            sentiment="negative",
+            service_ref_id=getattr(
+                interaction, "hotel_id", getattr(interaction, "activity_id", None)
+            ),
+        ).count()
+
+        interaction.neutral_count = Review.objects.filter(
+            user=interaction.user,
+            sentiment="neutral",
+            service_ref_id=getattr(
+                interaction, "hotel_id", getattr(interaction, "activity_id", None)
+            ),
+        ).count()
+
+        interaction.update_weighted_score()
+        interaction.save()
+
+    # =========================
+    # 🔹 Update chính
+    # =========================
+    @transaction.atomic
     def update(self, request, *args, **kwargs):
         review = self.get_object()
         serializer = self.get_serializer(review, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         updated_review = serializer.save()
 
-        # ✅ Nếu có comment mới thì phân tích lại cảm xúc
+        # =========================
+        # 🔹 PHÂN TÍCH CẢM XÚC MỚI
+        # =========================
         if updated_review.comment and updated_review.comment.strip():
             result = _sentiment_analyzer(updated_review.comment)[0]
             label = result["label"]
-            score = float(result["score"])
+            score = round(float(result["score"]), 4)
 
-            sentiment = (
-                "positive"
-                if label == "POS"
-                else "negative" if label == "NEG" else "neutral"
-            )
+            if label == "POS":
+                sentiment = "positive"
+            elif label == "NEG":
+                sentiment = "negative"
+            else:
+                sentiment = "neutral"
 
             updated_review.sentiment = sentiment
             updated_review.confidence = score
             updated_review.save(update_fields=["sentiment", "confidence"])
 
-        # ✅ Cập nhật lại điểm trung bình & số lượng review
+        # =========================
+        # 🔹 CẬP NHẬT THỐNG KÊ VÀ INTERACTION
+        # =========================
         service_type = getattr(updated_review, "service_type", None)
+        ref_id = getattr(updated_review, "service_ref_id", None)
 
         if service_type == ServiceType.HOTEL:
-            hotel = Hotel.objects.filter(id=updated_review.service_ref_id).first()
+            hotel = self.update_service_stats(Hotel, ServiceType.HOTEL, ref_id)
             if hotel:
-                stats = Review.objects.filter(
-                    service_type=ServiceType.HOTEL, service_ref_id=hotel.id
-                ).aggregate(avg=Avg("rating"), count=Count("id"))
-                hotel.avg_star = stats["avg"] or 0
-                hotel.review_count = stats["count"]
-                hotel.save(update_fields=["avg_star", "review_count"])
+                interaction, _ = UserHotelInteraction.objects.get_or_create(
+                    user=request.user, hotel=hotel
+                )
+                self.update_interaction(interaction, updated_review.sentiment)
 
         elif service_type == ServiceType.ACTIVITY:
-            activity = Activity.objects.filter(id=updated_review.service_ref_id).first()
+            activity = self.update_service_stats(Activity, ServiceType.ACTIVITY, ref_id)
             if activity:
-                stats = Review.objects.filter(
-                    service_type=ServiceType.ACTIVITY, service_ref_id=activity.id
-                ).aggregate(avg=Avg("rating"), count=Count("id"))
-                activity.avg_star = stats["avg"] or 0
-                activity.review_count = stats["count"]
-                activity.save(update_fields=["avg_star", "review_count"])
+                interaction, _ = UserActivityInteraction.objects.get_or_create(
+                    user=request.user, activity=activity
+                )
+                self.update_interaction(interaction, updated_review.sentiment)
 
-        # ✅ Trả response chuẩn
+        # =========================
+        # 🔹 TRẢ KẾT QUẢ
+        # =========================
         return Response(
             {
                 "isSuccess": True,
@@ -287,13 +439,106 @@ class ReviewUpdateView(generics.UpdateAPIView):
 class ReviewDeleteView(generics.DestroyAPIView):
     queryset = Review.objects.all().order_by("-created_at")
     serializer_class = ReviewSerializer
-    permission_classes = [
-        IsAuthenticated
-    ]  # Chỉ người dùng đã đăng nhập mới có thể xóa review
+    permission_classes = [IsAuthenticated]
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        service_type = instance.service_type
+        ref_id = instance.service_ref_id
+        user = request.user
+
+        # Lưu lại sentiment trước khi xóa để cập nhật Interaction
+        old_sentiment = instance.sentiment
+
+        # Xóa review
         self.perform_destroy(instance)
+
+        # =========================
+        # 🔹 HÀM CẬP NHẬT THỐNG KÊ
+        # =========================
+        def update_service_stats(model, type_value, ref_id):
+            service = model.objects.filter(id=ref_id).first()
+            if not service:
+                return None
+
+            reviews = Review.objects.filter(
+                service_type=type_value, service_ref_id=ref_id
+            )
+
+            stats = reviews.aggregate(
+                avg_star=Avg("rating"),
+                review_count=Count("id"),
+                total_positive=Count("id", filter=Q(sentiment="positive")),
+                total_negative=Count("id", filter=Q(sentiment="negative")),
+                total_neutral=Count("id", filter=Q(sentiment="neutral")),
+            )
+
+            service.avg_star = stats["avg_star"] or 0
+            service.review_count = stats["review_count"] or 0
+            service.total_positive = stats["total_positive"] or 0
+            service.total_negative = stats["total_negative"] or 0
+            service.total_neutral = stats["total_neutral"] or 0
+
+            service.save(
+                update_fields=[
+                    "avg_star",
+                    "review_count",
+                    "total_positive",
+                    "total_negative",
+                    "total_neutral",
+                ]
+            )
+
+            # ✅ Cập nhật lại total_weighted_score
+            service.update_total_weighted_score()
+            return service
+
+        # =========================
+        # 🔹 GỌI CẬP NHẬT & CẬP NHẬT INTERACTION
+        # =========================
+        if service_type == ServiceType.HOTEL:
+            hotel = update_service_stats(Hotel, ServiceType.HOTEL, ref_id)
+
+            if hotel:
+                interaction = UserHotelInteraction.objects.filter(
+                    user=user, hotel=hotel
+                ).first()
+                if interaction:
+                    # Giảm số lượng sentiment tương ứng
+                    if old_sentiment == "positive" and interaction.positive_count > 0:
+                        interaction.positive_count -= 1
+                    elif old_sentiment == "negative" and interaction.negative_count > 0:
+                        interaction.negative_count -= 1
+                    elif old_sentiment == "neutral" and interaction.neutral_count > 0:
+                        interaction.neutral_count -= 1
+
+                    # Cập nhật lại điểm cá nhân hóa
+                    interaction.update_weighted_score()
+                    interaction.save()
+
+        elif service_type == ServiceType.ACTIVITY:
+            activity = update_service_stats(Activity, ServiceType.ACTIVITY, ref_id)
+
+            if activity:
+                interaction = UserActivityInteraction.objects.filter(
+                    user=user, activity=activity
+                ).first()
+                if interaction:
+                    # Giảm số lượng sentiment tương ứng
+                    if old_sentiment == "positive" and interaction.positive_count > 0:
+                        interaction.positive_count -= 1
+                    elif old_sentiment == "negative" and interaction.negative_count > 0:
+                        interaction.negative_count -= 1
+                    elif old_sentiment == "neutral" and interaction.neutral_count > 0:
+                        interaction.neutral_count -= 1
+
+                    # Cập nhật lại điểm cá nhân hóa
+                    interaction.update_weighted_score()
+                    interaction.save()
+
+        # =========================
+        # 🔹 TRẢ KẾT QUẢ
+        # =========================
         return Response(
             {
                 "isSuccess": True,

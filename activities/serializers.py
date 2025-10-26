@@ -5,6 +5,7 @@ from .models import (
     ActivityPackage,
     ActivityDate,
     ActivityDateBookingDetail,
+    UserActivityInteraction,
 )
 from cities.models import City
 from cities.serializers import CityCreateSerializer
@@ -73,6 +74,23 @@ class ActivityCreateSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]  # Chỉ có những trường cần thiết
+
+
+class UserActivityInteractionSerializer(serializers.ModelSerializer):
+    activity = ActivityCreateSerializer(read_only=True)
+
+    class Meta:
+        model = UserActivityInteraction
+        fields = "__all__"
+
+
+class UserActivityInteractionCreateSerializer(serializers.ModelSerializer):
+    activity = serializers.PrimaryKeyRelatedField(queryset=Activity.objects.all())
+
+    class Meta:
+        model = UserActivityInteraction
+        fields = "__all__"
+        read_only_fields = ["weighted_score", "last_interacted"]
 
 
 class ActivityPackageSerializer(serializers.ModelSerializer):
