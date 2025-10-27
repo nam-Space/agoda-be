@@ -71,7 +71,7 @@ class ActivityPagination(PageNumberPagination):
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
-            elif field in ["avg_star"]:
+            if field in ["avg_star"]:
                 try:
                     int_value = int(value)
                     self.filters["avg_star__gte"] = int_value
@@ -79,7 +79,7 @@ class ActivityPagination(PageNumberPagination):
                 except ValueError:
                     pass
 
-            elif field in ["min_avg_price", "max_avg_price"]:
+            if field in ["min_avg_price", "max_avg_price"]:
                 min_avg_price = request.query_params.get("min_avg_price")
                 max_avg_price = request.query_params.get("max_avg_price")
 
@@ -95,7 +95,7 @@ class ActivityPagination(PageNumberPagination):
                     except ValueError:
                         pass
 
-            elif field in ["min_total_time", "max_total_time"]:
+            if field in ["min_total_time", "max_total_time"]:
                 min_total_time = request.query_params.get("min_total_time")
                 max_total_time = request.query_params.get("max_total_time")
 
@@ -153,7 +153,7 @@ class ActivityListView(generics.ListAPIView):
     queryset = Activity.objects.all()
     serializer_class = ActivitySerializer
     pagination_class = ActivityPagination
-    authentication_classes = [JWTAuthentication]  # Bỏ qua tất cả các lớp xác thực
+    authentication_classes = [JWTAuthentication]
     permission_classes = []  # Không cần kiểm tra quyền
     filter_backends = [DjangoFilterBackend]
 
@@ -185,7 +185,7 @@ class ActivityListView(generics.ListAPIView):
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
-            elif field in ["avg_star"]:
+            if field in ["avg_star"]:
                 try:
                     int_value = int(value)
                     query_filter &= Q(**{f"{field}__gte": int_value}) & Q(
@@ -194,7 +194,7 @@ class ActivityListView(generics.ListAPIView):
                 except ValueError:
                     pass  # bỏ qua nếu không phải số hợp lệ
 
-            elif field in ["min_avg_price", "max_avg_price"]:
+            if field in ["min_avg_price", "max_avg_price"]:
                 min_avg_price = filter_params.get("min_avg_price")
                 max_avg_price = filter_params.get("max_avg_price")
 
@@ -210,7 +210,7 @@ class ActivityListView(generics.ListAPIView):
                     except ValueError:
                         pass
 
-            elif field in ["min_total_time", "max_total_time"]:
+            if field in ["min_total_time", "max_total_time"]:
                 min_total_time = filter_params.get("min_total_time")
                 max_total_time = filter_params.get("max_total_time")
 
@@ -268,7 +268,19 @@ class ActivityListView(generics.ListAPIView):
         elif order_fields:
             queryset = queryset.order_by(*order_fields)
 
-        return queryset
+        # Lấy tham số 'current' từ query string để tính toán trang
+        current = self.request.query_params.get(
+            "current", 1
+        )  # Trang hiện tại, mặc định là trang 1
+        page_size = self.request.query_params.get(
+            "pageSize", 10
+        )  # Số phần tử mỗi trang, mặc định là 10
+
+        # Áp dụng phân trang
+        paginator = Paginator(queryset, page_size)
+        page = paginator.get_page(current)
+
+        return page
 
 
 class ActivityCreateView(generics.CreateAPIView):
