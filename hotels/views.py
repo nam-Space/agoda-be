@@ -21,24 +21,93 @@ from django.db.models import Sum
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.exceptions import AuthenticationFailed, ValidationError, NotFound
 from django.db.models.functions import Coalesce
+import math
+from django.core.paginator import Paginator
 
 
 # -------------------- Pagination --------------------
 class HotelPagination(PageNumberPagination):
-    page_size = 10  # default
-    page_size_query_param = "pageSize"
-    page_query_param = "current"
+    page_size = 10  # Default value
+    currentPage = 1
+    filters = {}
+
+    def get_page_size(self, request):
+        # Lấy giá trị pageSize từ query string, nếu có
+        page_size = request.query_params.get("pageSize")
+        currentPage = request.query_params.get("current")
+        city_id = request.query_params.get("cityId")
+
+        if city_id:
+            self.filters["city_id"] = city_id
+
+        for field, value in request.query_params.items():
+            if field not in [
+                "current",
+                "pageSize",
+                "cityId",
+                "recommended",
+                "avg_star",
+                "min_avg_price",
+                "max_avg_price",
+                "sort",
+            ]:
+                # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
+                self.filters[f"{field}__icontains"] = value
+            if field in ["avg_star"]:
+                try:
+                    int_value = int(value)
+                    self.filters["avg_star__gte"] = int_value
+                    self.filters["avg_star__lt"] = int_value + 1
+                except ValueError:
+                    pass
+
+            if field in ["min_avg_price", "max_avg_price"]:
+                min_avg_price = request.query_params.get("min_avg_price")
+                max_avg_price = request.query_params.get("max_avg_price")
+
+                if min_avg_price:
+                    try:
+                        self.filters["min_price__gte"] = float(min_avg_price)
+                    except ValueError:
+                        pass
+
+                if max_avg_price:
+                    try:
+                        self.filters["min_price__lte"] = float(max_avg_price)
+                    except ValueError:
+                        pass
+
+        # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
+        try:
+            self.page_size = int(page_size) if page_size is not None else self.page_size
+        except (ValueError, TypeError):
+            self.page_size = self.page_size
+
+        try:
+            self.currentPage = (
+                int(currentPage) if currentPage is not None else self.currentPage
+            )
+        except (ValueError, TypeError):
+            self.currentPage = self.currentPage
+
+        return self.page_size
 
     def get_paginated_response(self, data):
+
+        total_count = Hotel.objects.filter(**self.filters).count()
+        total_pages = math.ceil(total_count / self.page_size)
+
+        self.filters.clear()
+
         return Response(
             {
                 "isSuccess": True,
-                "message": "Fetched hotels successfully!",
+                "message": "Fetched hotel successfully!",
                 "meta": {
-                    "totalItems": self.page.paginator.count,
-                    "currentPage": self.page.number,
-                    "itemsPerPage": self.get_page_size(self.request),
-                    "totalPages": self.page.paginator.num_pages,
+                    "totalItems": total_count,
+                    "currentPage": self.currentPage,
+                    "itemsPerPage": self.page_size,
+                    "totalPages": total_pages,
                 },
                 "data": data,
             }
@@ -71,13 +140,65 @@ class HotelListView(generics.ListAPIView):
         # ---- other filters ----
         q_filter = Q()
         for field, value in params.items():
-            if field not in ["pageSize", "current", "cityId", "recommended"]:
+            if field not in [
+                "pageSize",
+                "current",
+                "cityId",
+                "recommended",
+                "avg_star",
+                "min_avg_price",
+                "max_avg_price",
+                "sort",
+            ]:
                 if field in [f.name for f in Hotel._meta.get_fields()]:
                     q_filter &= Q(**{f"{field}__icontains": value})
+
+            if field in ["avg_star"]:
+                try:
+                    int_value = int(value)
+                    q_filter &= Q(**{f"{field}__gte": int_value}) & Q(
+                        **{f"{field}__lt": int_value + 1}
+                    )
+                except ValueError:
+                    pass  # bỏ qua nếu không phải số hợp lệ
+
+            if field in ["min_avg_price", "max_avg_price"]:
+                min_avg_price = params.get("min_avg_price")
+                max_avg_price = params.get("max_avg_price")
+
+                if min_avg_price:
+                    try:
+                        q_filter &= Q(min_price__gte=float(min_avg_price))
+                    except ValueError:
+                        pass
+
+                if max_avg_price:
+                    try:
+                        q_filter &= Q(min_price__lte=float(max_avg_price))
+                    except ValueError:
+                        pass
+
+        # Áp dụng lọc cho queryset
         queryset = queryset.filter(q_filter)
+        sort_params = params.get("sort")
+        order_fields = []
+
+        if sort_params:
+            # Ví dụ: sort=avg_price-desc,avg_star-asc
+            sort_list = sort_params.split(",")
+            for sort_item in sort_list:
+                try:
+                    field, direction = sort_item.split("-")
+                    if direction == "desc":
+                        order_fields.append(f"-{field}")
+                    else:
+                        order_fields.append(field)
+                except ValueError:
+                    continue  # bỏ qua format không hợp lệ
 
         # ---- Recommended sorting ----
         recommended = params.get("recommended")
+
         if recommended:
             if user and user.is_authenticated:
                 user_interaction = UserHotelInteraction.objects.filter(
@@ -89,11 +210,30 @@ class HotelListView(generics.ListAPIView):
                         Subquery(user_interaction, output_field=FloatField()),
                         Value(0.0),
                     )
-                ).order_by("-weighted_score_user", "-total_weighted_score")
-            else:
-                queryset = queryset.order_by("-total_weighted_score")
+                )
 
-        return queryset
+                # Nếu có order_fields thì thêm sau weighted_score_user
+                queryset = queryset.order_by(
+                    "-weighted_score_user", "-total_weighted_score", *order_fields
+                )
+            else:
+                queryset = queryset.order_by("-total_weighted_score", *order_fields)
+        elif order_fields:
+            queryset = queryset.order_by(*order_fields)
+
+        # Lấy tham số 'current' từ query string để tính toán trang
+        current = self.request.query_params.get(
+            "current", 1
+        )  # Trang hiện tại, mặc định là trang 1
+        page_size = self.request.query_params.get(
+            "pageSize", 10
+        )  # Số phần tử mỗi trang, mặc định là 10
+
+        # Áp dụng phân trang
+        paginator = Paginator(queryset, page_size)
+        page = paginator.get_page(current)
+
+        return page
 
 
 # -------------------- Hotel Create --------------------
