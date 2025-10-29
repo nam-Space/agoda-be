@@ -197,34 +197,54 @@ class LogoutView(APIView):
 class UserPagination(PageNumberPagination):
     page_size = 10  # Default value
     currentPage = 1
+    filters = {}
 
     def get_page_size(self, request):
         # Lấy giá trị pageSize từ query string, nếu có
         page_size = request.query_params.get("pageSize")
         currentPage = request.query_params.get("current")
 
+        for field, value in request.query_params.items():
+            if field not in [
+                "current",
+                "pageSize",
+            ]:
+                # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
+                self.filters[f"{field}__icontains"] = value
+
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
-        self.page_size = int(page_size)
-        self.currentPage = int(currentPage)
+        try:
+            self.page_size = int(page_size) if page_size is not None else self.page_size
+        except (ValueError, TypeError):
+            self.page_size = self.page_size
+
+        try:
+            self.currentPage = (
+                int(currentPage) if currentPage is not None else self.currentPage
+            )
+        except (ValueError, TypeError):
+            self.currentPage = self.currentPage
+
         return self.page_size
 
     def get_paginated_response(self, data):
-        # Lấy tổng số bản ghi trong cơ sở dữ liệu
-        total_count = CustomUser.objects.all().count()
 
+        total_count = CustomUser.objects.filter(**self.filters).count()
         total_pages = math.ceil(total_count / self.page_size)
+
+        self.filters.clear()
 
         return Response(
             {
                 "isSuccess": True,
-                "message": "Get users successfully!",
+                "message": "Fetched users successfully!",
                 "meta": {
-                    "totalItems": total_count,  # Tổng số bản ghi
-                    "currentPage": self.currentPage,  # Trang hiện tại
-                    "itemsPerPage": self.page_size,  # Số bản ghi mỗi trang
+                    "totalItems": total_count,
+                    "currentPage": self.currentPage,
+                    "itemsPerPage": self.page_size,
                     "totalPages": total_pages,
                 },
-                "data": data,  # Dữ liệu đã phân trang
+                "data": data,
             }
         )
 

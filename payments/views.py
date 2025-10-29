@@ -232,3 +232,240 @@ class PaymentViewSet(viewsets.ModelViewSet):
             )
 
         return Response({"success": True, "detail": message}, status=status.HTTP_200_OK)
+
+
+# payments/views.py
+from rest_framework import generics
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from .models import Payment
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+import math
+from django.core.paginator import Paginator
+from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q, Count
+from bookings.models import Booking
+from bookings.constants.booking_status import BookingStatus
+from rest_framework import status
+from .serializers import PaymentCreateSerializer
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+
+# Phân trang
+class PaymentPagination(PageNumberPagination):
+    page_size = 10  # Default value
+    currentPage = 1
+    filters = {}
+
+    def get_page_size(self, request):
+        # Lấy giá trị pageSize từ query string, nếu có
+        page_size = request.query_params.get("pageSize")
+        currentPage = request.query_params.get("current")
+        booking__service_type = request.query_params.get("booking__service_type")
+        booking__service_ref_id = request.query_params.get("booking__service_ref_id")
+
+        if booking__service_type:
+            self.filters["booking__service_type"] = booking__service_type
+
+        if booking__service_ref_id:
+            self.filters["booking__service_ref_id"] = booking__service_ref_id
+
+        for field, value in request.query_params.items():
+            if field not in [
+                "current",
+                "pageSize",
+                "booking__service_type",
+                "booking__service_ref_id",
+            ]:
+                # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
+                self.filters[f"{field}__icontains"] = value
+
+        # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
+        try:
+            self.page_size = int(page_size) if page_size is not None else self.page_size
+        except (ValueError, TypeError):
+            self.page_size = self.page_size
+
+        try:
+            self.currentPage = (
+                int(currentPage) if currentPage is not None else self.currentPage
+            )
+        except (ValueError, TypeError):
+            self.currentPage = self.currentPage
+
+        return self.page_size
+
+    def get_paginated_response(self, data):
+        total_count = Payment.objects.filter(**self.filters).count()
+        total_pages = math.ceil(total_count / self.page_size)
+
+        self.filters.clear()
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched payments successfully!",
+                "meta": {
+                    "totalItems": total_count,
+                    "currentPage": self.currentPage,
+                    "itemsPerPage": self.page_size,
+                    "totalPages": total_pages,
+                },
+                "data": data,
+            }
+        )
+
+
+# API GET danh sách hóa đơn (với phân trang)
+class PaymentListView(generics.ListAPIView):
+    queryset = Payment.objects.all().order_by("-created_at")
+    serializer_class = PaymentSerializer
+    pagination_class = PaymentPagination
+    authentication_classes = [JWTAuthentication]  # ✅ cần có để lấy user
+    permission_classes = []
+    filter_backends = [DjangoFilterBackend]
+
+    def get_queryset(self):
+        queryset = Payment.objects.all()
+
+        # Lọc dữ liệu theo query params
+        filter_params = self.request.query_params
+        query_filter = Q()
+
+        # lọc theo service_type (service_type là FK trong model Hotel)
+        booking__service_type = filter_params.get("booking__service_type")
+        if booking__service_type:
+            query_filter &= Q(booking__service_type=booking__service_type)
+
+        booking__service_ref_id = filter_params.get("booking__service_ref_id")
+        if booking__service_ref_id:
+            query_filter &= Q(booking__service_ref_id=booking__service_ref_id)
+
+        for field, value in filter_params.items():
+            if field not in [
+                "pageSize",
+                "current",
+                "booking__service_type",
+                "booking__service_ref_id",
+            ]:  # Bỏ qua các trường phân trang
+                query_filter &= Q(**{f"{field}__icontains": value})
+
+        # Áp dụng lọc cho queryset
+        queryset = queryset.filter(query_filter)
+
+        # Lấy tham số 'current' từ query string để tính toán trang
+        current = self.request.query_params.get(
+            "current", 1
+        )  # Trang hiện tại, mặc định là trang 1
+        page_size = self.request.query_params.get(
+            "pageSize", 10
+        )  # Số phần tử mỗi trang, mặc định là 10
+
+        # Áp dụng phân trang
+        paginator = Paginator(queryset, page_size)
+        page = paginator.get_page(current)
+
+        return page
+
+
+class PaymentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
+    authentication_classes = []
+    permission_classes = []
+
+    def retrieve(self, request, *args, **kwargs):
+        payment = self.get_object()
+        serializer = self.get_serializer(payment)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Payment details fetched successfully",
+                "data": serializer.data,
+            }
+        )
+
+
+# API POST tạo hóa đơn
+class PaymentCreateView(generics.CreateAPIView):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentCreateSerializer
+    permission_classes = [
+        IsAuthenticated
+    ]  # Chỉ người dùng đã đăng nhập mới có thể tạo hóa đơn
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            payment = serializer.save()
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "Payment created successfully",
+                    "data": PaymentCreateSerializer(payment).data,
+                },
+                status=200,
+            )
+
+        return Response(
+            {
+                "isSuccess": False,
+                "message": "Failed to create payment",
+                "data": serializer.errors,
+            },
+            status=400,
+        )
+
+
+# API PUT hoặc PATCH để cập nhật hóa đơn
+class PaymentUpdateView(generics.UpdateAPIView):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentCreateSerializer
+    permission_classes = [
+        IsAuthenticated
+    ]  # Chỉ người dùng đã đăng nhập mới có thể sửa hóa đơn
+
+    def update(self, request, *args, **kwargs):
+        payment = self.get_object()
+        serializer = self.get_serializer(payment, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "Payment updated successfully",
+                    "data": serializer.data,
+                }
+            )
+
+        return Response(
+            {
+                "isSuccess": False,
+                "message": "Failed to update payment",
+                "data": serializer.errors,
+            },
+            status=400,
+        )
+
+
+# API DELETE xóa hóa đơn
+class PaymentDeleteView(generics.DestroyAPIView):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentCreateSerializer
+    permission_classes = [
+        IsAuthenticated
+    ]  # Chỉ người dùng đã đăng nhập mới có thể xóa hóa đơn
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Payment deleted successfully",
+                "data": {},
+            },
+            status=status.HTTP_200_OK,
+        )

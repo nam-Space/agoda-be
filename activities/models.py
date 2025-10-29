@@ -8,6 +8,13 @@ import math
 
 # Model hoạt động
 class Activity(models.Model):
+    event_organizer = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        related_name="activities",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(max_length=255, null=True, blank=True)
     city = models.ForeignKey(City, on_delete=models.CASCADE, related_name="activities")
 
