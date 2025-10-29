@@ -20,11 +20,19 @@ class CustomUser(AbstractUser):
         ("staff", "Staff"),
         ("driver", "Driver"),
         ("owner", "Owner"),
+        ("event_organizer", "Event Organizer"),
     ]
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default="customer")
+    role = models.CharField(max_length=255, choices=ROLE_CHOICES, default="customer")
     birthday = models.DateField(null=True, blank=True)
     phone_number = models.CharField(max_length=15, null=True, blank=True)
     avatar = models.CharField(max_length=255, null=True, blank=True)
+    manager = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="staffs",
+        null=True,
+        blank=True,
+    )
 
     def __str__(self):
         return self.username

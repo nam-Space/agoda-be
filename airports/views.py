@@ -2,7 +2,7 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from .models import Airport
-from .serializers import AirportSerializer
+from .serializers import AirportSerializer, AirportCreateSerializer
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from rest_framework.response import Response
@@ -109,7 +109,7 @@ class AirportDetailView(generics.RetrieveUpdateDestroyAPIView):
 # API POST tạo sân bay
 class AirportCreateView(generics.CreateAPIView):
     queryset = Airport.objects.all()
-    serializer_class = AirportSerializer
+    serializer_class = AirportCreateSerializer
     permission_classes = [
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể tạo sân bay
@@ -122,7 +122,7 @@ class AirportCreateView(generics.CreateAPIView):
                 {
                     "isSuccess": True,
                     "message": "Airport created successfully",
-                    "data": AirportSerializer(airport).data,
+                    "data": AirportCreateSerializer(airport).data,
                 },
                 status=200,
             )
@@ -140,7 +140,7 @@ class AirportCreateView(generics.CreateAPIView):
 # API PUT hoặc PATCH để cập nhật sân bay
 class AirportUpdateView(generics.UpdateAPIView):
     queryset = Airport.objects.all()
-    serializer_class = AirportSerializer
+    serializer_class = AirportCreateSerializer
     permission_classes = [
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể sửa sân bay

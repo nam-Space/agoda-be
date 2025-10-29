@@ -9,6 +9,8 @@ from .models import (
 )
 from cities.models import City
 from cities.serializers import CityCreateSerializer
+from accounts.serializers import UserSerializer
+from accounts.models import CustomUser
 
 
 class ActivityDateSerializer(serializers.ModelSerializer):
@@ -38,6 +40,7 @@ class ActivityImageSerializer(serializers.ModelSerializer):
 class ActivitySerializer(serializers.ModelSerializer):
     images = ActivityImageSerializer(many=True, read_only=True)
     city = CityCreateSerializer(read_only=True)
+    event_organizer = UserSerializer(read_only=True)
 
     class Meta:
         model = Activity
@@ -57,6 +60,11 @@ class ActivityDetailSerializer(serializers.ModelSerializer):
 class ActivityCreateSerializer(serializers.ModelSerializer):
     # Sử dụng PrimaryKeyRelatedField để nhận ID của hoạt động
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all())
+    event_organizer = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.all(),
+        required=False,  # ✅ Không bắt buộc
+        allow_null=True,  # ✅ Cho phép giá trị null
+    )
 
     class Meta:
         model = Activity
@@ -71,6 +79,7 @@ class ActivityCreateSerializer(serializers.ModelSerializer):
             "avg_price",
             "avg_star",
             "total_time",
+            "event_organizer",
             "created_at",
             "updated_at",
         ]  # Chỉ có những trường cần thiết
