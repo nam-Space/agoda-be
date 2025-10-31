@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Room, RoomImage, RoomBookingDetail, RoomAmenity
 from hotels.serializers import HotelCreateSerializer
+from accounts.serializers import UserSerializer
 
 
 class RoomImageSerializer(serializers.ModelSerializer):
@@ -26,10 +27,11 @@ class RoomAmenitySerializer(serializers.ModelSerializer):
 
 class RoomBookingDetailSerializer(serializers.ModelSerializer):
     room = RoomSerializer(read_only=True)
+    owner_hotel = UserSerializer(read_only=True)
 
     class Meta:
         model = RoomBookingDetail
-        fields = ["id", "room", "check_in", "check_out", "num_guests"]
+        fields = ["id", "room", "check_in", "check_out", "num_guests", "owner_hotel"]
 
 
 class RoomBookingDetailCreateSerializer(serializers.ModelSerializer):

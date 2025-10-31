@@ -264,6 +264,11 @@ class PaymentPagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
         booking__service_type = request.query_params.get("booking__service_type")
         booking__service_ref_id = request.query_params.get("booking__service_ref_id")
+        owner_hotel_id = request.query_params.get("owner_hotel_id")
+        event_organizer_activity_id = request.query_params.get(
+            "event_organizer_activity_id"
+        )
+        driver_id = request.query_params.get("driver_id")
 
         if booking__service_type:
             self.filters["booking__service_type"] = booking__service_type
@@ -271,12 +276,33 @@ class PaymentPagination(PageNumberPagination):
         if booking__service_ref_id:
             self.filters["booking__service_ref_id"] = booking__service_ref_id
 
+        # ✅ Lưu filter theo owner_hotel_id (RoomBookingDetail)
+        if owner_hotel_id:
+            # chỉ áp dụng cho booking có service_type là HOTEL
+            self.filters["booking__service_type"] = ServiceType.HOTEL
+            self.filters["booking__hotel_detail__owner_hotel_id"] = owner_hotel_id
+
+        if event_organizer_activity_id:
+            # chỉ áp dụng cho booking có service_type là ACTIVITY
+            self.filters["booking__service_type"] = ServiceType.ACTIVITY
+            self.filters[
+                "booking__activity_date_detail__event_organizer_activity_id"
+            ] = event_organizer_activity_id
+
+        if driver_id:
+            # chỉ áp dụng cho booking có service_type là CAR
+            self.filters["booking__service_type"] = ServiceType.CAR
+            self.filters["booking__car_detail__driver_id"] = driver_id
+
         for field, value in request.query_params.items():
             if field not in [
                 "current",
                 "pageSize",
                 "booking__service_type",
                 "booking__service_ref_id",
+                "owner_hotel_id",
+                "event_organizer_activity_id",
+                "driver_id",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
@@ -327,7 +353,7 @@ class PaymentListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend]
 
     def get_queryset(self):
-        queryset = Payment.objects.all()
+        queryset = Payment.objects.all().order_by("-created_at")
 
         # Lọc dữ liệu theo query params
         filter_params = self.request.query_params
@@ -342,17 +368,42 @@ class PaymentListView(generics.ListAPIView):
         if booking__service_ref_id:
             query_filter &= Q(booking__service_ref_id=booking__service_ref_id)
 
+        # --- Lọc theo owner_hotel (truy ngược qua RoomBookingDetail) ---
+        owner_hotel_id = filter_params.get("owner_hotel_id")
+        if owner_hotel_id:
+            query_filter &= Q(
+                booking__hotel_detail__owner_hotel_id=owner_hotel_id,
+                booking__service_type=ServiceType.HOTEL,  # chỉ lọc khi service_type là HOTEL
+            )
+
+        event_organizer_activity_id = filter_params.get("event_organizer_activity_id")
+        if event_organizer_activity_id:
+            query_filter &= Q(
+                booking__activity_date_detail__event_organizer_activity_id=event_organizer_activity_id,
+                booking__service_type=ServiceType.ACTIVITY,  # chỉ lọc khi service_type là ACTIVITY
+            )
+
+        driver_id = filter_params.get("driver_id")
+        if driver_id:
+            query_filter &= Q(
+                booking__car_detail__driver_id=driver_id,
+                booking__service_type=ServiceType.CAR,  # chỉ lọc khi service_type là CAR
+            )
+
         for field, value in filter_params.items():
             if field not in [
                 "pageSize",
                 "current",
                 "booking__service_type",
                 "booking__service_ref_id",
+                "owner_hotel_id",
+                "event_organizer_activity_id",
+                "driver_id",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
         # Áp dụng lọc cho queryset
-        queryset = queryset.filter(query_filter)
+        queryset = queryset.filter(query_filter).order_by("-created_at")
 
         # Lấy tham số 'current' từ query string để tính toán trang
         current = self.request.query_params.get(

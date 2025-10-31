@@ -211,8 +211,13 @@ from rest_framework import generics
 from rest_framework.response import Response
 from django.db.models import Q, Prefetch
 from datetime import datetime
-from .models import Room, RoomImage, RoomAmenity
-from .serializers import RoomSerializer, RoomImageSerializer, RoomAmenitySerializer
+from .models import Room, RoomImage, RoomAmenity, RoomBookingDetail
+from .serializers import (
+    RoomSerializer,
+    RoomImageSerializer,
+    RoomAmenitySerializer,
+    RoomBookingDetailSerializer,
+)
 from bookings.models import Booking
 
 
@@ -528,3 +533,24 @@ class RoomSearchView(generics.ListAPIView):
             },
             status=200,
         )
+
+
+class RoomBookingDetailView(generics.RetrieveAPIView):
+    queryset = RoomBookingDetail.objects.all()
+    serializer_class = RoomBookingDetailSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            data = serializer.data
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "Fetch RoomBookingDetailSerializer successfully!",
+                    "data": data,
+                },
+                status=200,
+            )
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)

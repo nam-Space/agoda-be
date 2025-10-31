@@ -130,7 +130,7 @@ class UserActivityInteraction(models.Model):
 # Model các gói hoạt động
 class ActivityPackage(models.Model):
     activity = models.ForeignKey(
-        "Activity", on_delete=models.CASCADE, related_name="activities_packages"
+        Activity, on_delete=models.CASCADE, related_name="activities_packages"
     )
     name = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -143,7 +143,7 @@ class ActivityPackage(models.Model):
 # Model các gói hoạt động
 class ActivityDate(models.Model):
     activity_package = models.ForeignKey(
-        "ActivityPackage", on_delete=models.CASCADE, related_name="activities_dates"
+        ActivityPackage, on_delete=models.CASCADE, related_name="activities_dates"
     )
     price_adult = models.FloatField(default=0.0)
     price_child = models.FloatField(default=0.0)
@@ -154,7 +154,7 @@ class ActivityDate(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.name}, {self.activity_package.name}"
+        return f"{self.date_launch}, {self.activity_package.name}"
 
 
 class ActivityDateBookingDetail(models.Model):
@@ -177,6 +177,26 @@ class ActivityDateBookingDetail(models.Model):
     city_name = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    event_organizer_activity = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        related_name="activities_dates_bookings",
+        null=True,
+        blank=True,
+    )
+
+    def save(self, *args, **kwargs):
+        # ✅ Tự động gán chủ khách sạn khi tạo booking
+        if (
+            self.activity_date
+            and self.activity_date.activity_package
+            and self.activity_date.activity_package.activity
+            and not self.event_organizer_activity
+        ):
+            self.event_organizer_activity = (
+                self.activity_date.activity_package.activity.event_organizer
+            )
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.city_name}, {self.activity_package_name}"

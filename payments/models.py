@@ -2,11 +2,12 @@
 from django.db import models
 from .constants.payment_status import PaymentStatus
 from .constants.payment_method import PaymentMethod
+from bookings.models import Booking
 
 
 class Payment(models.Model):
     booking = models.ForeignKey(
-        "bookings.Booking", on_delete=models.CASCADE, related_name="payments"
+        Booking, on_delete=models.CASCADE, related_name="payments"
     )
     method = models.IntegerField(choices=PaymentMethod.choices)
     amount = models.FloatField(default=0.0)
