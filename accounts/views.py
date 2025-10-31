@@ -272,7 +272,6 @@ class UserListView(generics.ListAPIView):
 
         # Duyệt qua các tham số query để tạo bộ lọc cho mỗi trường
         for field, value in filter_params.items():
-            print(f"field={field}")
             if (field != "current") and (
                 field != "pageSize"
             ):  # Kiểm tra trường có tồn tại trong model CustomUser không

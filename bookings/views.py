@@ -14,7 +14,10 @@ from cars.serializers import (
     CarBookingDetailCreateSerializer,
 )
 from flights.serializers import FlightBookingDetailSerializer
-from activities.serializers import ActivityDateBookingDetailSerializer
+from activities.serializers import (
+    ActivityDateBookingDetailSerializer,
+    ActivityDateBookingCreateSerializer,
+)
 from .constants.service_type import ServiceType
 from rooms.models import RoomBookingDetail
 from cars.models import CarBookingDetail
@@ -87,7 +90,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         elif service_type == ServiceType.ACTIVITY:
             activity_date_data = request.data.get("activity_date_detail")
             if activity_date_data:
-                activity_date_serializer = ActivityDateBookingDetailSerializer(
+                activity_date_serializer = ActivityDateBookingCreateSerializer(
                     data=activity_date_data
                 )
                 activity_date_serializer.is_valid(raise_exception=True)

@@ -35,11 +35,27 @@ class CarCreateSerializer(serializers.ModelSerializer):
 
 class CarBookingDetailSerializer(serializers.ModelSerializer):
     car = CarSerializer()
+    driver = UserSerializer(read_only=True)
 
     class Meta:
         model = CarBookingDetail
 
-        fields = "__all__"
+        fields = [
+            "id",
+            "car",
+            "pickup_location",
+            "dropoff_location",
+            "lat1",
+            "lng1",
+            "lat2",
+            "lng2",
+            "pickup_datetime",
+            "driver_required",
+            "distance_km",
+            "total_time_estimate",
+            "passenger_quantity_booking",
+            "driver",
+        ]
 
 
 class CarBookingDetailCreateSerializer(serializers.ModelSerializer):

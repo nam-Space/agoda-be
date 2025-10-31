@@ -76,6 +76,7 @@ class HotelCreateSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "min_price",
+            "review_count",
             "total_click",
             "total_positive",
             "total_negative",

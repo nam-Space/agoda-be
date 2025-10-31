@@ -111,6 +111,38 @@ class ActivityPackageSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ActivityPackageListForActivityAndDateLaunchSerializer(
+    serializers.ModelSerializer
+):
+    activity = ActivitySerializer()
+    activities_dates = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ActivityPackage
+        fields = "__all__"
+
+    def get_activities_dates(self, obj):
+        request = self.context.get("request")
+        params = request.query_params if request else {}
+
+        date_launch = params.get("date_launch")
+        min_date_launch = params.get("min_date_launch")
+        max_date_launch = params.get("max_date_launch")
+
+        dates = obj.activities_dates.all()
+
+        if date_launch:
+            dates = dates.filter(date_launch=date_launch)
+        elif min_date_launch and max_date_launch:
+            dates = dates.filter(date_launch__range=[min_date_launch, max_date_launch])
+        elif min_date_launch:
+            dates = dates.filter(date_launch__gte=min_date_launch)
+        elif max_date_launch:
+            dates = dates.filter(date_launch__lte=max_date_launch)
+
+        return ActivityDateSerializer(dates, many=True).data
+
+
 class ActivityPackageCreateSerializer(serializers.ModelSerializer):
     # Sử dụng PrimaryKeyRelatedField để nhận ID của activity
     activity = serializers.PrimaryKeyRelatedField(queryset=Activity.objects.all())
@@ -154,10 +186,10 @@ class ActivityDateCreateSerializer(serializers.ModelSerializer):
 
 
 class ActivityDateBookingDetailSerializer(serializers.ModelSerializer):
-    # Sử dụng PrimaryKeyRelatedField để nhận ID của activity package
-    activity_date = serializers.PrimaryKeyRelatedField(
-        queryset=ActivityDate.objects.all()
-    )
+    # Sử dụng PrimaryKeyRelatedField để nhận ID của activity date
+    activity_date = ActivityDateSerializer(read_only=True)
+
+    event_organizer_activity = UserSerializer(read_only=True)
 
     class Meta:
         model = ActivityDateBookingDetail
@@ -177,11 +209,12 @@ class ActivityDateBookingDetailSerializer(serializers.ModelSerializer):
             "city_name",
             "created_at",
             "updated_at",
+            "event_organizer_activity",
         ]  # Chỉ có những trường cần thiết
 
 
 class ActivityDateBookingCreateSerializer(serializers.ModelSerializer):
-    # Sử dụng PrimaryKeyRelatedField để nhận ID của activity package
+    # Sử dụng PrimaryKeyRelatedField để nhận ID của activity date
     activity_date = serializers.PrimaryKeyRelatedField(
         queryset=ActivityDate.objects.all()
     )
@@ -189,6 +222,7 @@ class ActivityDateBookingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ActivityDateBookingDetail
         fields = [
+            "id",
             "activity_date",
             "price_adult",
             "price_child",

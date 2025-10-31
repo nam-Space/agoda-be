@@ -9,7 +9,7 @@ from .views import (
     RoomImageDeleteView,
     RoomAmenityListView,
     RoomSearchView,
-
+    RoomBookingDetailView,
 )
 
 urlpatterns = [
@@ -29,4 +29,9 @@ urlpatterns = [
         name="room-amenities",
     ),
     path("rooms/search/", RoomSearchView.as_view(), name="room-search"),
+    path(
+        "rooms-booking/<int:pk>/",
+        RoomBookingDetailView.as_view(),
+        name="room-booking-detail",
+    ),
 ]

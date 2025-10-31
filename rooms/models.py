@@ -42,6 +42,7 @@ from django.db import models
 from hotels.models import Hotel
 from django.utils import timezone
 from bookings.models import Booking
+from accounts.models import CustomUser
 
 
 # Create your models here.
@@ -134,6 +135,19 @@ class RoomBookingDetail(models.Model):
     check_in = models.DateField()
     check_out = models.DateField()
     num_guests = models.IntegerField()
+    owner_hotel = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        related_name="room_bookings",
+        null=True,
+        blank=True,
+    )
+
+    def save(self, *args, **kwargs):
+        # ✅ Tự động gán chủ khách sạn khi tạo booking
+        if self.room and self.room.hotel and not self.owner_hotel:
+            self.owner_hotel = self.room.hotel.owner
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"HotelBooking for {self.booking.booking_code}"

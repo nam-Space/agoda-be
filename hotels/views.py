@@ -36,15 +36,20 @@ class HotelPagination(PageNumberPagination):
         page_size = request.query_params.get("pageSize")
         currentPage = request.query_params.get("current")
         city_id = request.query_params.get("cityId")
+        owner_id = request.query_params.get("ownerId")
 
         if city_id:
             self.filters["city_id"] = city_id
+
+        if owner_id:
+            self.filters["owner_id"] = owner_id
 
         for field, value in request.query_params.items():
             if field not in [
                 "current",
                 "pageSize",
                 "cityId",
+                "ownerId",
                 "recommended",
                 "avg_star",
                 "min_avg_price",
@@ -137,6 +142,14 @@ class HotelListView(generics.ListAPIView):
             except ValueError:
                 return Hotel.objects.none()
 
+        owner = params.get("ownerId")
+        if owner:
+            try:
+                owner = int(owner)
+                queryset = queryset.filter(owner=owner)
+            except ValueError:
+                return Hotel.objects.none()
+
         # ---- other filters ----
         q_filter = Q()
         for field, value in params.items():
@@ -144,6 +157,7 @@ class HotelListView(generics.ListAPIView):
                 "pageSize",
                 "current",
                 "cityId",
+                "ownerId",
                 "recommended",
                 "avg_star",
                 "min_avg_price",
