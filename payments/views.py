@@ -16,6 +16,9 @@ from payments.constants.payment_status import PaymentStatus
 from payments.constants.payment_method import PaymentMethod
 from bookings.constants.service_type import ServiceType
 from bookings.constants.booking_status import BookingStatus
+from django.db.models.functions import TruncDay, TruncMonth, TruncQuarter, TruncYear
+from django.db.models import Sum
+from datetime import timedelta
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -418,6 +421,159 @@ class PaymentListView(generics.ListAPIView):
         page = paginator.get_page(current)
 
         return page
+
+
+class PaymentListOverviewView(generics.ListAPIView):
+    serializer_class = PaymentSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]  # hoặc [] nếu bạn không cần xác thực
+
+    def get_queryset(self):
+        queryset = Payment.objects.all()
+        params = self.request.query_params
+
+        min_date = params.get("min_date")
+        max_date = params.get("max_date")
+        booking__service_type = params.get("booking__service_type")
+        booking__service_ref_id = params.get("booking__service_ref_id")
+        owner_hotel_id = params.get("owner_hotel_id")
+        event_organizer_activity_id = params.get("event_organizer_activity_id")
+        driver_id = params.get("driver_id")
+        hotel_id = params.get("hotel_id")
+        activity_id = params.get("activity_id")
+        car_id = params.get("car_id")
+
+        if min_date and max_date:
+            queryset = queryset.filter(created_at__range=[min_date, max_date])
+        elif min_date:
+            queryset = queryset.filter(created_at__gte=min_date)
+        elif max_date:
+            queryset = queryset.filter(created_at__lte=max_date)
+
+        if booking__service_type:
+            queryset = queryset.filter(booking__service_type=booking__service_type)
+
+        if booking__service_ref_id:
+            queryset = queryset.filter(booking__service_ref_id=booking__service_ref_id)
+
+        if owner_hotel_id:
+            queryset = queryset.filter(
+                booking__hotel_detail__owner_hotel_id=owner_hotel_id,
+                booking__service_type=ServiceType.HOTEL,
+            )
+
+        if event_organizer_activity_id:
+            queryset = queryset.filter(
+                booking__activity_date_detail__event_organizer_activity_id=event_organizer_activity_id,
+                booking__service_type=ServiceType.ACTIVITY,
+            )
+
+        if driver_id:
+            queryset = queryset.filter(
+                booking__car_detail__driver_id=driver_id,
+                booking__service_type=ServiceType.CAR,
+            )
+
+        if hotel_id:
+            queryset = queryset.filter(
+                booking__hotel_detail__room__hotel_id=hotel_id,
+                booking__service_type=ServiceType.HOTEL,
+            )
+
+        if activity_id:
+            queryset = queryset.filter(
+                booking__activity_date_detail__activity_date__activity_package__activity_id=activity_id,
+                booking__service_type=ServiceType.ACTIVITY,
+            )
+
+        if car_id:
+            queryset = queryset.filter(
+                booking__car_detail__car_id=car_id,
+                booking__service_type=ServiceType.CAR,
+            )
+
+        return queryset.distinct()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        params = self.request.query_params
+        statistic_by = params.get("statistic_by", "month")  # mặc định là month
+
+        # 🧮 Chọn hàm group theo statistic_by
+        if statistic_by == "day":
+            trunc_func = TruncDay
+        elif statistic_by == "quarter":
+            trunc_func = TruncQuarter
+        elif statistic_by == "year":
+            trunc_func = TruncYear
+        else:
+            trunc_func = TruncMonth
+
+        # 🔹 Gom nhóm dữ liệu theo thời gian
+        grouped_data = (
+            queryset.annotate(period=trunc_func("created_at"))
+            .values("period")
+            .annotate(
+                total_revenue=Sum("amount"),
+                customer_count=Count("booking__user", distinct=True),
+                order_count=Count("id", distinct=True),
+            )
+            .order_by("period")
+        )
+
+        labels, revenues, total, customers, orders = [], [], 0, [], []
+
+        for entry in grouped_data:
+            date_obj = entry["period"]
+            if not date_obj:
+                continue
+
+            if statistic_by == "day":
+                label = date_obj.strftime("%d %b %Y")
+            elif statistic_by == "month":
+                label = date_obj.strftime("%b %Y")
+            elif statistic_by == "quarter":
+                q = (date_obj.month - 1) // 3 + 1
+                label = f"Q{q} {date_obj.year}"
+            else:
+                label = str(date_obj.year)
+
+            labels.append(label)
+            revenue = entry["total_revenue"] or 0
+            revenues.append(revenue)
+            total += revenue
+            customers.append(entry["customer_count"])
+            orders.append(entry["order_count"])
+
+        # ✅ Tính phần trăm tăng trưởng an toàn
+        def calc_growth(arr):
+            if len(arr) < 2 or arr[-2] == 0:
+                return 0.0
+            return round(((arr[-1] - arr[-2]) / arr[-2]) * 100, 2)
+
+        revenue_growth = calc_growth(revenues)
+        customer_growth = calc_growth(customers)
+        order_growth = calc_growth(orders)
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": (
+                    "Get payment overview successfully!" if queryset else "No data"
+                ),
+                "data": {
+                    "labels": labels,
+                    "revenues": revenues,
+                    "total_revenue": total,
+                    "revenue_growth": revenue_growth,
+                    "customers": customers,
+                    "customer_growth": customer_growth,
+                    "orders": orders,
+                    "order_growth": order_growth,
+                    "statistic_by": statistic_by,
+                },
+            }
+        )
 
 
 class PaymentDetailView(generics.RetrieveUpdateDestroyAPIView):

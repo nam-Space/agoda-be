@@ -8,6 +8,7 @@ from .views import (
     PaymentCreateView,
     PaymentUpdateView,
     PaymentDeleteView,
+    PaymentListOverviewView,
 )
 
 router = DefaultRouter()
@@ -17,6 +18,11 @@ urlpatterns = [
     path(
         "payments/", PaymentListView.as_view(), name="payment-list"
     ),  # GET tất cả thành phố, phân trang
+    path(
+        "payments/overview/",
+        PaymentListOverviewView.as_view(),
+        name="payment-overview-list",
+    ),
     path(
         "payments/create/", PaymentCreateView.as_view(), name="payment-create"
     ),  # POST tạo payments
