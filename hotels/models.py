@@ -22,7 +22,6 @@ class Hotel(models.Model):
     lng = models.FloatField(null=True, blank=True)
     location = models.TextField(null=True, blank=True)
     nearbyLocation = models.TextField(blank=True, null=True)
-    point = models.FloatField(default=0.0)
     mostFeature = models.TextField(blank=True, null=True)
     facilities = models.TextField(blank=True, null=True)
     withUs = models.TextField(blank=True, null=True)
