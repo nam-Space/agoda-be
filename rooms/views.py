@@ -488,7 +488,6 @@ class RoomSearchView(generics.ListAPIView):
             "lng": hotel.lng,
             "location": hotel.location,
             "nearbyLocation": hotel.nearbyLocation,
-            "point": hotel.point,
             "avg_star": hotel.avg_star,
             "facilities": hotel.facilities,
             "withUs": hotel.withUs,

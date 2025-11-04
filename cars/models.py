@@ -15,7 +15,6 @@ class Car(models.Model):
     description = models.TextField(blank=True, null=True)
     capacity = models.PositiveIntegerField()  # số chỗ ngồi
     luggage = models.PositiveIntegerField(null=True)  # số hành lý
-    point = models.FloatField(default=0.0)  # có thể là toạ độ hoặc điểm số
     avg_star = models.DecimalField(
         max_digits=2, decimal_places=1, default=0.0
     )  # VD: 4.5 sao

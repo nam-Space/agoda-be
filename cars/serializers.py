@@ -25,7 +25,6 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "description",
             "capacity",
             "luggage",
-            "point",
             "avg_star",
             "price_per_km",
             "avg_speed",
