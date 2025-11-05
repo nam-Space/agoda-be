@@ -16,6 +16,7 @@ from .serializers import (
     ActivityImageSerializer,
     ActivityPackageSerializer,
     ActivityPackageCreateSerializer,
+    ActivityPackageListForActivityAndDateLaunchSerializer,
     ActivityDateSerializer,
     ActivityDateCreateSerializer,
     ActivityDateBookingDetailSerializer,
@@ -36,9 +37,10 @@ from rest_framework import status
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.db.models.functions import Coalesce
 from django.db.models import Q, OuterRef, Subquery, Value
-from django.db.models import F, FloatField, ExpressionWrapper, functions as Func
+from django.db.models import Avg, F, FloatField, ExpressionWrapper, functions as Func
 from rest_framework.exceptions import AuthenticationFailed, ValidationError, NotFound
 from django.db.models import Sum
+from django.utils import timezone
 
 
 # Phân trang
@@ -52,15 +54,20 @@ class ActivityPagination(PageNumberPagination):
         page_size = request.query_params.get("pageSize")
         currentPage = request.query_params.get("current")
         city_id = request.query_params.get("city_id")
+        event_organizer_id = request.query_params.get("event_organizer_id")
 
         if city_id:
             self.filters["city_id"] = city_id
+
+        if event_organizer_id:
+            self.filters["event_organizer_id"] = event_organizer_id
 
         for field, value in request.query_params.items():
             if field not in [
                 "current",
                 "pageSize",
                 "city_id",
+                "event_organizer_id",
                 "recommended",
                 "avg_star",
                 "min_avg_price",
@@ -71,7 +78,7 @@ class ActivityPagination(PageNumberPagination):
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
-            elif field in ["avg_star"]:
+            if field in ["avg_star"]:
                 try:
                     int_value = int(value)
                     self.filters["avg_star__gte"] = int_value
@@ -79,7 +86,7 @@ class ActivityPagination(PageNumberPagination):
                 except ValueError:
                     pass
 
-            elif field in ["min_avg_price", "max_avg_price"]:
+            if field in ["min_avg_price", "max_avg_price"]:
                 min_avg_price = request.query_params.get("min_avg_price")
                 max_avg_price = request.query_params.get("max_avg_price")
 
@@ -95,7 +102,7 @@ class ActivityPagination(PageNumberPagination):
                     except ValueError:
                         pass
 
-            elif field in ["min_total_time", "max_total_time"]:
+            if field in ["min_total_time", "max_total_time"]:
                 min_total_time = request.query_params.get("min_total_time")
                 max_total_time = request.query_params.get("max_total_time")
 
@@ -153,7 +160,7 @@ class ActivityListView(generics.ListAPIView):
     queryset = Activity.objects.all()
     serializer_class = ActivitySerializer
     pagination_class = ActivityPagination
-    authentication_classes = [JWTAuthentication]  # Bỏ qua tất cả các lớp xác thực
+    authentication_classes = [JWTAuthentication]
     permission_classes = []  # Không cần kiểm tra quyền
     filter_backends = [DjangoFilterBackend]
 
@@ -170,11 +177,16 @@ class ActivityListView(generics.ListAPIView):
         if city_id:
             query_filter &= Q(city_id=city_id)
 
+        event_organizer_id = filter_params.get("event_organizer_id")
+        if event_organizer_id:
+            query_filter &= Q(event_organizer_id=event_organizer_id)
+
         for field, value in filter_params.items():
             if field not in [
                 "pageSize",
                 "current",
                 "city_id",
+                "event_organizer_id",
                 "recommended",
                 "avg_star",
                 "min_avg_price",
@@ -185,7 +197,7 @@ class ActivityListView(generics.ListAPIView):
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
-            elif field in ["avg_star"]:
+            if field in ["avg_star"]:
                 try:
                     int_value = int(value)
                     query_filter &= Q(**{f"{field}__gte": int_value}) & Q(
@@ -194,7 +206,7 @@ class ActivityListView(generics.ListAPIView):
                 except ValueError:
                     pass  # bỏ qua nếu không phải số hợp lệ
 
-            elif field in ["min_avg_price", "max_avg_price"]:
+            if field in ["min_avg_price", "max_avg_price"]:
                 min_avg_price = filter_params.get("min_avg_price")
                 max_avg_price = filter_params.get("max_avg_price")
 
@@ -210,7 +222,7 @@ class ActivityListView(generics.ListAPIView):
                     except ValueError:
                         pass
 
-            elif field in ["min_total_time", "max_total_time"]:
+            if field in ["min_total_time", "max_total_time"]:
                 min_total_time = filter_params.get("min_total_time")
                 max_total_time = filter_params.get("max_total_time")
 
@@ -268,7 +280,19 @@ class ActivityListView(generics.ListAPIView):
         elif order_fields:
             queryset = queryset.order_by(*order_fields)
 
-        return queryset
+        # Lấy tham số 'current' từ query string để tính toán trang
+        current = self.request.query_params.get(
+            "current", 1
+        )  # Trang hiện tại, mặc định là trang 1
+        page_size = self.request.query_params.get(
+            "pageSize", 10
+        )  # Số phần tử mỗi trang, mặc định là 10
+
+        # Áp dụng phân trang
+        paginator = Paginator(queryset, page_size)
+        page = paginator.get_page(current)
+
+        return page
 
 
 class ActivityCreateView(generics.CreateAPIView):
@@ -285,6 +309,10 @@ class ActivityCreateView(generics.CreateAPIView):
         if serializer.is_valid():
             # Lưu activity mới
             activity = serializer.save()
+
+            # 🔹 Đặt giá trung bình mặc định = 0 khi mới tạo
+            activity.avg_price = 0
+            activity.save(update_fields=["avg_price"])
 
             # Kiểm tra xem có ảnh được gửi lên không
             new_images = request.data.get("images", [])
@@ -355,6 +383,26 @@ class ActivityUpdateView(generics.UpdateAPIView):
             new_images = request.data.get("images", [])
             for image in new_images:
                 ActivityImage.objects.create(activity=updated_activity, image=image)
+
+            # ✅ Cập nhật avg_price dựa trên ActivityDate có ngày >= hiện tại
+            # Lấy thời điểm hiện tại theo timezone
+            now = timezone.now()
+            # Chuyển về 00:00:00 của hôm nay
+            today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            activity_dates = ActivityDate.objects.filter(
+                activity_package__activity=updated_activity, date_launch__gte=today
+            )
+
+            if activity_dates.exists():
+                avg_price = (
+                    activity_dates.annotate(
+                        mean_price=(F("price_adult") + F("price_child")) / 2.0
+                    ).aggregate(avg_price=Avg("mean_price"))["avg_price"]
+                    or 0.0
+                )
+
+                updated_activity.avg_price = round(avg_price, 2)
+                updated_activity.save(update_fields=["avg_price"])
 
             return Response(
                 {
@@ -536,20 +584,46 @@ class ActivityImageDeleteView(generics.DestroyAPIView):
 class ActivityPackagePagination(PageNumberPagination):
     page_size = 10  # Default value
     currentPage = 1
+    filters = {}
 
     def get_page_size(self, request):
         # Lấy giá trị pageSize từ query string, nếu có
         page_size = request.query_params.get("pageSize")
         currentPage = request.query_params.get("current")
 
+        for field, value in request.query_params.items():
+            if field not in [
+                "current",
+                "pageSize",
+                "event_organizer_id",
+            ]:
+                # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
+                self.filters[f"{field}__icontains"] = value
+
+            if field in ["event_organizer_id"]:
+                self.filters["activity__event_organizer_id"] = value
+                # print(f"activity__event_organizer_id={value}")
+
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
-        self.page_size = int(page_size)
-        self.currentPage = int(currentPage)
+        try:
+            self.page_size = int(page_size) if page_size is not None else self.page_size
+        except (ValueError, TypeError):
+            self.page_size = self.page_size
+
+        try:
+            self.currentPage = (
+                int(currentPage) if currentPage is not None else self.currentPage
+            )
+        except (ValueError, TypeError):
+            self.currentPage = self.currentPage
+
         return self.page_size
 
     def get_paginated_response(self, data):
-        total_count = ActivityPackage.objects.all().count()
+        total_count = ActivityPackage.objects.filter(**self.filters).count()
         total_pages = math.ceil(total_count / self.page_size)
+
+        self.filters.clear()
 
         return Response(
             {
@@ -583,8 +657,16 @@ class ActivityPackageListView(generics.ListAPIView):
         query_filter = Q()
 
         for field, value in filter_params.items():
-            if field not in ["pageSize", "current"]:  # Bỏ qua các trường phân trang
+            if field not in [
+                "pageSize",
+                "current",
+                "event_organizer_id",
+            ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
+
+            # ✅ Nếu là event_organizer_id, lọc theo quan hệ ngược từ Activity
+            if field in ["event_organizer_id"]:
+                query_filter &= Q(activity__event_organizer_id=value)
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
@@ -606,14 +688,18 @@ class ActivityPackageListView(generics.ListAPIView):
 
 # API GET danh sách activity package dựa trên activity_id và date_launch (không phân trang)
 class ActivityPackageListForActivityAndDateLaunchView(generics.ListAPIView):
-    serializer_class = ActivityPackageSerializer
+    serializer_class = ActivityPackageListForActivityAndDateLaunchSerializer
     authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
     permission_classes = []  # Không cần kiểm tra quyền
 
     def get_queryset(self):
         queryset = ActivityPackage.objects.all()
-        activity_id = self.request.query_params.get("activity_id")
-        date_launch = self.request.query_params.get("date_launch")
+        params = self.request.query_params
+
+        activity_id = params.get("activity_id")
+        date_launch = params.get("date_launch")
+        min_date_launch = params.get("min_date_launch")
+        max_date_launch = params.get("max_date_launch")
 
         if activity_id:
             queryset = queryset.filter(activity_id=activity_id)
@@ -621,7 +707,21 @@ class ActivityPackageListForActivityAndDateLaunchView(generics.ListAPIView):
         if date_launch:
             queryset = queryset.filter(activities_dates__date_launch=date_launch)
 
-        return queryset
+        # 🔹 Lọc theo khoảng ngày (từ - đến)
+        if min_date_launch and max_date_launch:
+            queryset = queryset.filter(
+                activities_dates__date_launch__range=[min_date_launch, max_date_launch]
+            )
+        elif min_date_launch:
+            queryset = queryset.filter(
+                activities_dates__date_launch__gte=min_date_launch
+            )
+        elif max_date_launch:
+            queryset = queryset.filter(
+                activities_dates__date_launch__lte=max_date_launch
+            )
+
+        return queryset.distinct()  # Tránh trùng lặp do join nhiều bảng
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -751,20 +851,48 @@ class ActivityPackageDeleteView(generics.DestroyAPIView):
 class ActivityDatePagination(PageNumberPagination):
     page_size = 10  # Default value
     currentPage = 1
+    filters = {}
 
     def get_page_size(self, request):
         # Lấy giá trị pageSize từ query string, nếu có
         page_size = request.query_params.get("pageSize")
         currentPage = request.query_params.get("current")
 
+        for field, value in request.query_params.items():
+            if field not in [
+                "current",
+                "pageSize",
+                "event_organizer_id",
+            ]:
+                # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
+                self.filters[f"{field}__icontains"] = value
+
+            if field in [
+                "event_organizer_id",
+            ]:
+                # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
+                self.filters["activity_package__activity__event_organizer_id"] = value
+
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
-        self.page_size = int(page_size)
-        self.currentPage = int(currentPage)
+        try:
+            self.page_size = int(page_size) if page_size is not None else self.page_size
+        except (ValueError, TypeError):
+            self.page_size = self.page_size
+
+        try:
+            self.currentPage = (
+                int(currentPage) if currentPage is not None else self.currentPage
+            )
+        except (ValueError, TypeError):
+            self.currentPage = self.currentPage
+
         return self.page_size
 
     def get_paginated_response(self, data):
-        total_count = ActivityDate.objects.all().count()
+        total_count = ActivityDate.objects.filter(**self.filters).count()
         total_pages = math.ceil(total_count / self.page_size)
+
+        self.filters.clear()
 
         return Response(
             {
@@ -798,8 +926,17 @@ class ActivityDateListView(generics.ListAPIView):
         query_filter = Q()
 
         for field, value in filter_params.items():
-            if field not in ["pageSize", "current"]:  # Bỏ qua các trường phân trang
+            if field not in [
+                "pageSize",
+                "current",
+                "event_organizer_id",
+            ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
+
+            if field in ["event_organizer_id"]:  # Bỏ qua các trường phân trang
+                query_filter &= Q(
+                    **{"activity_package__activity__event_organizer_id": value}
+                )
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
@@ -854,6 +991,24 @@ class ActivityDateCreateView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             activity_date = serializer.save()
+            # ✅ Sau khi tạo ActivityDate -> cập nhật avg_price của Activity liên quan
+            activity = activity_date.activity_package.activity
+
+            # ✅ Lấy 00:00:00 của hôm nay (để tránh lệch giờ)
+            today = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # ✅ Lấy tất cả các ActivityDate có ngày >= hôm nay của activity này
+            valid_dates = ActivityDate.objects.filter(
+                activity_package__activity=activity, date_launch__gte=today
+            ).values_list("price_adult", "price_child")
+
+            # ✅ Tính giá trung bình
+            prices = [(p_adult + p_child) / 2 for p_adult, p_child in valid_dates]
+            if prices:
+                avg_price = sum(prices) / len(prices)
+                activity.avg_price = avg_price
+                activity.save(update_fields=["avg_price"])
+
             return Response(
                 {
                     "isSuccess": True,
@@ -906,6 +1061,32 @@ class ActivityDateBulkCreateView(APIView):
             )
             created_dates.append(ActivityDateCreateSerializer(activity_date).data)
 
+        # ========================================
+        # 🔹 Cập nhật avg_price của Activity
+        # ========================================
+        try:
+            activity_package = ActivityPackage.objects.get(id=activity_package_id)
+            activity = activity_package.activity
+
+            # ✅ Lấy 00:00:00 của hôm nay (để tránh lệch giờ)
+            today = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # Lấy tất cả ActivityDate thuộc về cùng Activity
+            all_dates = ActivityDate.objects.filter(
+                activity_package__activity=activity, date_launch__gte=today
+            )
+
+            # Tính giá trung bình (avg_price)
+            if all_dates.exists():
+                avg_price = (
+                    sum((d.price_adult + d.price_child) / 2 for d in all_dates)
+                    / all_dates.count()
+                )
+                activity.avg_price = avg_price
+                activity.save(update_fields=["avg_price"])
+        except ActivityPackage.DoesNotExist:
+            pass  # Trường hợp package không tồn tại, bỏ qua cập nhật
+
         return Response(
             {
                 "isSuccess": True,
@@ -929,7 +1110,26 @@ class ActivityDateUpdateView(generics.UpdateAPIView):
         serializer = self.get_serializer(activity_date, data=request.data, partial=True)
 
         if serializer.is_valid():
-            serializer.save()
+            activity_date_updated = serializer.save()
+
+            # ✅ Sau khi tạo ActivityDate -> cập nhật avg_price của Activity liên quan
+            activity = activity_date_updated.activity_package.activity
+
+            # ✅ Lấy 00:00:00 của hôm nay (để tránh lệch giờ)
+            today = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            # ✅ Lấy tất cả các ActivityDate có ngày >= hôm nay của activity này
+            valid_dates = ActivityDate.objects.filter(
+                activity_package__activity=activity, date_launch__gte=today
+            ).values_list("price_adult", "price_child")
+
+            # ✅ Tính giá trung bình
+            prices = [(p_adult + p_child) / 2 for p_adult, p_child in valid_dates]
+            if prices:
+                avg_price = sum(prices) / len(prices)
+                activity.avg_price = avg_price
+                activity.save(update_fields=["avg_price"])
+
             return Response(
                 {
                     "isSuccess": True,
@@ -956,7 +1156,36 @@ class ActivityDateDeleteView(generics.DestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+
+        # 🔹 Lưu lại Activity liên quan trước khi xóa
+        activity = instance.activity_package.activity
+
         self.perform_destroy(instance)
+
+        # 🔹 Cập nhật lại avg_price của Activity
+        today = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Lấy tất cả ActivityDate còn lại (>= hôm nay)
+        remaining_dates = ActivityDate.objects.filter(
+            activity_package__activity=activity,
+            date_launch__gte=today,
+        )
+
+        if remaining_dates.exists():
+            avg_price = (
+                sum(
+                    ((d.price_adult or 0) + (d.price_child or 0)) / 2
+                    for d in remaining_dates
+                )
+                / remaining_dates.count()
+            )
+            activity.avg_price = float(avg_price)
+        else:
+            # Nếu không còn ActivityDate nào hợp lệ, đặt avg_price = 0
+            activity.avg_price = 0
+
+        activity.save(update_fields=["avg_price"])
+
         return Response(
             {
                 "isSuccess": True,
@@ -997,8 +1226,45 @@ class ActivityDateBulkDeleteView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Tìm các ActivityPackage chứa các ActivityDate này
+        packages_to_update = ActivityPackage.objects.filter(
+            activities_dates__in=dates_to_delete
+        )
+
+        # Tìm các Activity liên quan
+        activities_to_update = list(
+            Activity.objects.filter(
+                activities_packages__in=packages_to_update
+            ).distinct()
+        )
+
         # Xóa các bản ghi
         dates_to_delete.delete()
+
+        # ========================================
+        # 🔹 Cập nhật avg_price của các Activity liên quan
+        # ========================================
+        today = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        for activity in activities_to_update:
+            all_dates = ActivityDate.objects.filter(
+                activity_package__activity=activity,
+                date_launch__gte=today,
+            )
+
+            if all_dates.exists():
+                avg_price = (
+                    sum(
+                        ((d.price_adult or 0) + (d.price_child or 0)) / 2
+                        for d in all_dates
+                    )
+                    / all_dates.count()
+                )
+                activity.avg_price = float(avg_price)
+            else:
+                activity.avg_price = 0
+
+            activity.save(update_fields=["avg_price"])
 
         return Response(
             {

@@ -127,9 +127,9 @@ WSGI_APPLICATION = "agoda_be.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "agoda3",  # Tên cơ sở dữ liệu MySQL
+        "NAME": "agoda5",  # Tên cơ sở dữ liệu MySQL
         "USER": "root",  # Tên người dùng MySQL
-        "PASSWORD": "",  # Mật khẩu người dùng MySQL
+        "PASSWORD": "2607",  # Mật khẩu người dùng MySQL
         "HOST": "localhost",
         "PORT": "3306",
         "OPTIONS": {
@@ -138,7 +138,6 @@ DATABASES = {
         },
     },
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

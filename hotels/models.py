@@ -35,6 +35,16 @@ class Hotel(models.Model):
     min_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True, default=0
     )
+    
+    # Discount information (không dùng hardcode)
+    original_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Giá gốc trước khi giảm (nếu có)"
+    )
+    discount_percentage = models.PositiveIntegerField(
+        default=0,
+        help_text="Phần trăm giảm giá (0-100)"
+    )
 
     # ✅ Thêm các trường thống kê hành vi
     total_click = models.PositiveIntegerField(default=0)
@@ -133,3 +143,34 @@ class UserHotelInteraction(models.Model):
         w1, w2 = 0.7, 0.3  # trọng số có thể tinh chỉnh
         self.weighted_score = w1 * sentiment + w2 * click_factor
         self.save(update_fields=["weighted_score"])
+
+
+class UserSearchHistory(models.Model):
+    """
+    Model lưu lịch sử tìm kiếm của user
+    """
+    user = models.ForeignKey(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        related_name="search_history",
+        null=True,
+        blank=True  # Allow anonymous users
+    )
+    session_key = models.CharField(max_length=255, null=True, blank=True)  # For anonymous users
+    destination = models.CharField(max_length=255)  # City/Hotel name searched
+    check_in = models.DateField(null=True, blank=True)
+    check_out = models.DateField(null=True, blank=True)
+    adults = models.PositiveIntegerField(default=1)
+    children = models.PositiveIntegerField(default=0)
+    rooms = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['session_key', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.destination} - {self.created_at.strftime('%Y-%m-%d')}"

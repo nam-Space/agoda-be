@@ -21,6 +21,9 @@ class HotelSimpleSerializer(serializers.ModelSerializer):
     min_price = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True
     )
+    original_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
 
     class Meta:
         model = Hotel
@@ -76,6 +79,7 @@ class HotelCreateSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "min_price",
+            "review_count",
             "total_click",
             "total_positive",
             "total_negative",
@@ -90,6 +94,9 @@ class HotelSearchSerializer(serializers.ModelSerializer):
     min_price = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True
     )
+    original_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
 
     class Meta:
         model = Hotel
@@ -97,8 +104,6 @@ class HotelSearchSerializer(serializers.ModelSerializer):
             "id",
             "images",
             "city",
-            "owner",
-            "city_id",
             "name",
             "description",
             "lat",
@@ -114,14 +119,17 @@ class HotelSearchSerializer(serializers.ModelSerializer):
             "locationInfo",
             "regulation",
             "avg_star",
+            "review_count",
             "created_at",
             "updated_at",
             "min_price",
+            "original_price",
+            "discount_percentage",
             "total_click",
             "total_positive",
             "total_negative",
             "total_neutral",
-            "weighted_score",
+            "total_weighted_score",
         ]
 
 

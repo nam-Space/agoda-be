@@ -46,6 +46,19 @@ class CarBookingDetail(models.Model):
     distance_km = models.FloatField(default=0.0)
     total_time_estimate = models.FloatField(default=0.0)
     passenger_quantity_booking = models.PositiveIntegerField(default=1)
+    driver = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        related_name="cars_bookings",
+        null=True,
+        blank=True,
+    )
+
+    def save(self, *args, **kwargs):
+        # ✅ Tự động gán chủ khách sạn khi tạo booking
+        if self.car and not self.driver:
+            self.driver = self.car.user
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"CarBooking for {self.booking.booking_code}"

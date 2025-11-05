@@ -5,24 +5,32 @@ from rest_framework.permissions import AllowAny
 from .models import Booking
 from .serializers import BookingSerializer
 from django.db.models import Q
-from rooms.serializers import RoomBookingDetailSerializer
+from rooms.serializers import (
+    RoomBookingDetailSerializer,
+    RoomBookingDetailCreateSerializer,
+)
 from cars.serializers import (
     CarBookingDetailSerializer,
     CarBookingDetailCreateSerializer,
 )
 from flights.serializers import FlightBookingDetailSerializer
-from activities.serializers import ActivityDateBookingDetailSerializer
+from activities.serializers import (
+    ActivityDateBookingDetailSerializer,
+    ActivityDateBookingCreateSerializer,
+)
 from .constants.service_type import ServiceType
 from rooms.models import RoomBookingDetail
 from cars.models import CarBookingDetail
 from flights.models import FlightBookingDetail
 from activities.models import ActivityDateBookingDetail
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
-    permission_classes = [AllowAny]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = []  # Không cần kiểm tra quyền
 
     def get_queryset(self):
         queryset = Booking.objects.all().order_by("-created_at")
@@ -50,33 +58,46 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         # Tìm lại detail trực tiếp trong DB
         if service_type == ServiceType.HOTEL:
-
-            detail = RoomBookingDetail.objects.filter(booking=booking).first()
-            if detail:
+            room_data = request.data.get("hotel_detail")
+            if room_data:
+                room_serializer = RoomBookingDetailCreateSerializer(data=room_data)
+                room_serializer.is_valid(raise_exception=True)
+                detail = room_serializer.save(booking=booking)
+                booking.service_ref_id = detail.id
+                booking.save(update_fields=["service_ref_id"])
                 data = RoomBookingDetailSerializer(detail).data
 
         elif service_type == ServiceType.CAR:
-
-            detail = CarBookingDetail.objects.filter(booking=booking).first()
-            if detail:
-                data = CarBookingDetailCreateSerializer(detail).data
+            car_data = request.data.get("car_detail")
+            if car_data:
+                car_serializer = CarBookingDetailCreateSerializer(data=car_data)
+                car_serializer.is_valid(raise_exception=True)
+                detail = car_serializer.save(booking=booking)
                 booking.service_ref_id = detail.id
                 booking.save(update_fields=["service_ref_id"])
+                data = CarBookingDetailSerializer(detail).data
 
         elif service_type == ServiceType.FLIGHT:
-
-            detail = FlightBookingDetail.objects.filter(booking=booking).first()
-            if detail:
+            flight_data = request.data.get("flight_detail")
+            if flight_data:
+                flight_serializer = FlightBookingDetailSerializer(data=flight_data)
+                flight_serializer.is_valid(raise_exception=True)
+                detail = flight_serializer.save(booking=booking)
+                booking.service_ref_id = detail.id
+                booking.save(update_fields=["service_ref_id"])
                 data = FlightBookingDetailSerializer(detail).data
 
         elif service_type == ServiceType.ACTIVITY:
-
-            detail = ActivityDateBookingDetail.objects.filter(booking=booking).first()
-            if detail:
-                data = ActivityDateBookingDetailSerializer(detail).data
-                # ✅ Cập nhật service_ref_id = ID của activity detail
+            activity_date_data = request.data.get("activity_date_detail")
+            if activity_date_data:
+                activity_date_serializer = ActivityDateBookingCreateSerializer(
+                    data=activity_date_data
+                )
+                activity_date_serializer.is_valid(raise_exception=True)
+                detail = activity_date_serializer.save(booking=booking)
                 booking.service_ref_id = detail.id
                 booking.save(update_fields=["service_ref_id"])
+                data = ActivityDateBookingDetailSerializer(detail).data
 
         return Response(
             {

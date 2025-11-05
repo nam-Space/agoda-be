@@ -16,6 +16,7 @@ class Flight(models.Model):
     arrival_datetime = models.DateTimeField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     seat_capacity = models.IntegerField()
+    available_seats = models.IntegerField(default=0)
 
 class FlightBookingDetail(models.Model):
     booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='flight_detail')

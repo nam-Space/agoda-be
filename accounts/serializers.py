@@ -40,6 +40,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class CreateUserSerializer(serializers.ModelSerializer):
+    manager = serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.all(), required=False, allow_null=True
+    )
+
     class Meta:
         model = get_user_model()
         fields = [
@@ -53,32 +57,59 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "gender",
             "role",
             "avatar",
+            "manager",
         ]
         extra_kwargs = {
             "password": {"write_only": True},
             "birthday": {"required": False},
             "avatar": {"required": False},
+            "manager": {"required": False},
         }
 
     def create(self, validated_data):
-        user = get_user_model().objects.create_user(
-            username=validated_data["username"],
-            email=validated_data["email"],
-            first_name=validated_data["first_name"],
-            last_name=validated_data["last_name"],
-            password=validated_data["password"],
-            birthday=validated_data.get("birthday", None),
-            phone_number=validated_data["phone_number"],
-            gender=validated_data["gender"],
-            role=validated_data["role"],
-            avatar=validated_data.get("avatar", None),
-        )
+        password = validated_data.pop("password", None)
+        user = get_user_model()(**validated_data)
+
+        if password:
+            user.set_password(password)
+
+        user.save()
         return user
+
+
+class UserSimpleSerializer(serializers.ModelSerializer):
+    hotel = serializers.SerializerMethodField()
+
+    class Meta:
+        model = get_user_model()
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "avatar",
+            "role",
+            "gender",
+            "phone_number",
+            "birthday",
+            "hotel",
+        ]
+
+    def get_hotel(self, obj):
+        # import lazy để tránh circular import
+        from hotels.serializers import HotelSimpleSerializer
+
+        if hasattr(obj, "hotel") and obj.hotel:
+            return HotelSimpleSerializer(obj.hotel).data
+        return None
 
 
 # Serializer cho thông tin người dùng
 class UserSerializer(serializers.ModelSerializer):
     hotel = serializers.SerializerMethodField()
+    manager = UserSimpleSerializer(read_only=True)  # quản lý
+    staffs = serializers.PrimaryKeyRelatedField(many=True, read_only=True)  # nhân viên
 
     class Meta:
         model = get_user_model()
@@ -96,6 +127,8 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "date_joined",
             "hotel",
+            "manager",  # 🆕 thêm trường quản lý
+            "staffs",  # 🆕 thêm danh sách nhân viên
         ]
         extra_kwargs = {"birthday": {"required": False}}
 
@@ -111,6 +144,9 @@ class UserSerializer(serializers.ModelSerializer):
 # Serializer cho thông tin người dùng (có mật khẩu)
 class UserAndPasswordSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)  # Không bắt buộc
+    manager = serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.all(), required=False, allow_null=True
+    )
 
     class Meta:
         model = get_user_model()
@@ -128,26 +164,23 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
             "is_active",
             "date_joined",
             "password",
+            "manager",
         ]
-        extra_kwargs = {"birthday": {"required": False}}
+        extra_kwargs = {
+            "birthday": {"required": False},
+            "manager": {"required": False},
+        }
 
     def update(self, instance, validated_data):
-        """
-        Cập nhật thông tin người dùng, bao gồm mật khẩu (nếu có).
-        """
-        password = validated_data.pop(
-            "password", None
-        )  # Lấy mật khẩu từ validated_data nếu có
+        password = validated_data.pop("password", None)
 
-        # Nếu có mật khẩu, mã hóa và lưu
         if password:
             instance.set_password(password)
 
-        # Cập nhật các trường còn lại
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        instance.save()  # Lưu lại đối tượng
+        instance.save()
         return instance
 
 

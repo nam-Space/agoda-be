@@ -2,7 +2,7 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from .models import Airport
-from .serializers import AirportSerializer
+from .serializers import AirportSerializer, AirportCreateSerializer
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from rest_framework.response import Response
@@ -18,12 +18,12 @@ class AirportPagination(PageNumberPagination):
 
     def get_page_size(self, request):
         # Lấy giá trị pageSize từ query string, nếu có
-        page_size = request.query_params.get("pageSize")
-        currentPage = request.query_params.get("current")
+        page_size = request.query_params.get("pageSize", 10)
+        currentPage = request.query_params.get("current", 1)
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
-        self.page_size = int(page_size)
-        self.currentPage = int(currentPage)
+        self.page_size = int(page_size) if page_size else 10
+        self.currentPage = int(currentPage) if currentPage else 1
         return self.page_size
 
     def get_paginated_response(self, data):
@@ -62,7 +62,11 @@ class AirportListView(generics.ListAPIView):
 
         for field, value in filter_params.items():
             if field not in ["pageSize", "current"]:
-                query_filter &= Q(**{f"{field}__icontains": value})
+                # Use exact match for id field, icontains for others
+                if field == "id":
+                    query_filter &= Q(**{field: value})
+                else:
+                    query_filter &= Q(**{f"{field}__icontains": value})
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
@@ -109,7 +113,7 @@ class AirportDetailView(generics.RetrieveUpdateDestroyAPIView):
 # API POST tạo sân bay
 class AirportCreateView(generics.CreateAPIView):
     queryset = Airport.objects.all()
-    serializer_class = AirportSerializer
+    serializer_class = AirportCreateSerializer
     permission_classes = [
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể tạo sân bay
@@ -122,7 +126,7 @@ class AirportCreateView(generics.CreateAPIView):
                 {
                     "isSuccess": True,
                     "message": "Airport created successfully",
-                    "data": AirportSerializer(airport).data,
+                    "data": AirportCreateSerializer(airport).data,
                 },
                 status=200,
             )
@@ -140,7 +144,7 @@ class AirportCreateView(generics.CreateAPIView):
 # API PUT hoặc PATCH để cập nhật sân bay
 class AirportUpdateView(generics.UpdateAPIView):
     queryset = Airport.objects.all()
-    serializer_class = AirportSerializer
+    serializer_class = AirportCreateSerializer
     permission_classes = [
         IsAuthenticated
     ]  # Chỉ người dùng đã đăng nhập mới có thể sửa sân bay
