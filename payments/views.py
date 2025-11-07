@@ -272,6 +272,7 @@ class PaymentPagination(PageNumberPagination):
             "event_organizer_activity_id"
         )
         driver_id = request.query_params.get("driver_id")
+        status = request.query_params.get("status")
 
         if booking__service_type:
             self.filters["booking__service_type"] = booking__service_type
@@ -297,6 +298,9 @@ class PaymentPagination(PageNumberPagination):
             self.filters["booking__service_type"] = ServiceType.CAR
             self.filters["booking__car_detail__driver_id"] = driver_id
 
+        if status:
+            self.filters["status"] = status
+
         for field, value in request.query_params.items():
             if field not in [
                 "current",
@@ -306,6 +310,8 @@ class PaymentPagination(PageNumberPagination):
                 "owner_hotel_id",
                 "event_organizer_activity_id",
                 "driver_id",
+                "status",
+                "sort",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
@@ -393,6 +399,12 @@ class PaymentListView(generics.ListAPIView):
                 booking__service_type=ServiceType.CAR,  # chỉ lọc khi service_type là CAR
             )
 
+        status = filter_params.get("status")
+        if status:
+            query_filter &= Q(
+                status=status,
+            )
+
         for field, value in filter_params.items():
             if field not in [
                 "pageSize",
@@ -402,11 +414,31 @@ class PaymentListView(generics.ListAPIView):
                 "owner_hotel_id",
                 "event_organizer_activity_id",
                 "driver_id",
+                "status",
+                "sort",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
         # Áp dụng lọc cho queryset
-        queryset = queryset.filter(query_filter).order_by("-created_at")
+        queryset = queryset.filter(query_filter)
+        sort_params = filter_params.get("sort")
+        order_fields = []
+
+        if sort_params:
+            # Ví dụ: sort=avg_price-desc,avg_star-asc
+            sort_list = sort_params.split(",")
+            for sort_item in sort_list:
+                try:
+                    field, direction = sort_item.split("-")
+                    if direction == "desc":
+                        order_fields.append(f"-{field}")
+                    else:
+                        order_fields.append(field)
+                except ValueError:
+                    continue  # bỏ qua format không hợp lệ
+
+        if order_fields:
+            queryset = queryset.order_by(*order_fields)
 
         # Lấy tham số 'current' từ query string để tính toán trang
         current = self.request.query_params.get(
