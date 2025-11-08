@@ -22,6 +22,8 @@ from .views import (
     ActivityDateBulkDeleteView,
     ActivityDateBookingDetailView,
     ActivityDateBookingCreateView,
+    UserActivityInteractionDetailView,
+    UserActivityInteractionUpsertView,
 )
 
 urlpatterns = [
@@ -49,6 +51,16 @@ urlpatterns = [
         ActivityImageDeleteView.as_view(),
         name="activity-image-delete",
     ),  # DELETE xóa ảnh activities
+    path(
+        "user-activity-interaction/<int:activity_id>/",
+        UserActivityInteractionDetailView.as_view(),
+        name="user-activity-interaction-detail",
+    ),  # GET chi tiết tương tác người dùng hoạt động
+    path(
+        "user-activity-interaction/upsert/",
+        UserActivityInteractionUpsertView.as_view(),
+        name="user-activity-interaction-upsert",
+    ),  # PUT/PATCH cập nhật tương tác người dùng hoạt động
     path(
         "activities-packages/",
         ActivityPackageListView.as_view(),
