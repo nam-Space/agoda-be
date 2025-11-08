@@ -31,10 +31,18 @@ class HotelSerializer(serializers.ModelSerializer):
     owner = UserSerializer(read_only=True)
     city_id = serializers.IntegerField(source="city.id", read_only=True)
     min_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-
+    promotion = serializers.SerializerMethodField()
+    has_promotion = serializers.SerializerMethodField()
+    
     class Meta:
         model = Hotel
         fields = "__all__"
+
+    def get_promotion(self, obj):
+        return obj.get_active_promotion()
+
+    def get_has_promotion(self, obj):
+        return obj.get_active_promotion() is not None
 
 
 class HotelCreateSerializer(serializers.ModelSerializer):

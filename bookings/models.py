@@ -6,7 +6,6 @@ from .constants.service_type import ServiceType
 from .constants.booking_status import BookingStatus
 from accounts.models import CustomUser
 
-
 class Booking(models.Model):
     service_type = models.PositiveSmallIntegerField(choices=ServiceType.choices)
     service_ref_id = models.IntegerField(null=True, blank=True)

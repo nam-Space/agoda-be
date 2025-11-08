@@ -56,12 +56,16 @@ class CityListView(generics.ListAPIView):
     def get_queryset(self):
         queryset = City.objects.all()
 
+        country_id = self.request.query_params.get("country_id")
+        if country_id:
+            queryset = queryset.filter(country_id=country_id)
+
         # Lọc dữ liệu theo query params
         filter_params = self.request.query_params
         query_filter = Q()
 
         for field, value in filter_params.items():
-            if field not in ["pageSize", "current"]:  # Bỏ qua các trường phân trang
+            if field not in ["pageSize", "current", "country_id"]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
         # Áp dụng lọc cho queryset

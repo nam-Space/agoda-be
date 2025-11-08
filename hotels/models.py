@@ -1,15 +1,15 @@
 from django.db import models
 from cities.models import City
 from django.db.models import Avg
-
+from django.utils import timezone
 
 class Hotel(models.Model):
     city = models.ForeignKey(
         City, on_delete=models.CASCADE, related_name="hotels", null=True
     )
-    owner = models.OneToOneField(  # 🔹 Liên kết 1-0 với CustomUser
+    owner = models.OneToOneField( 
         "accounts.CustomUser",
-        on_delete=models.SET_NULL,  # Nếu user bị xóa, giữ hotel lại
+        on_delete=models.SET_NULL,  
         related_name="hotel",
         null=True,
         blank=True,
@@ -40,6 +40,34 @@ class Hotel(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_active_promotion(self):
+        now = timezone.now()
+        hotel_promotions = self.promotions.select_related("promotion").all()
+
+        # Chỉ lấy những promotion đang active
+        active_promos = [
+            hp for hp in hotel_promotions
+            if hp.promotion.is_active and hp.promotion.start_date <= now <= hp.promotion.end_date
+        ]
+        
+        if not active_promos:
+            return None
+
+        # Lấy promotion có effective discount lớn nhất
+        best_promo = max(
+            active_promos,
+            key=lambda hp: hp.custom_discount_percent if hp.custom_discount_percent is not None else hp.promotion.discount_percent
+        )
+
+        promo = best_promo.promotion
+        return {
+            "title": promo.title,
+            "discount_percent": best_promo.custom_discount_percent or promo.discount_percent,
+            "discount_amount": best_promo.custom_discount_amount or promo.discount_amount,
+            "start_date": promo.start_date,
+            "end_date": promo.end_date,
+        }
 
     # ✅ Hàm tự cập nhật giá trung bình của các phòng còn available
     def update_min_price(self):

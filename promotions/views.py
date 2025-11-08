@@ -6,12 +6,15 @@ from .serializers import (
     HotelPromotionSerializer,
     FlightPromotionSerializer,
 )
+from django.utils import timezone
 
-
-class PromotionViewSet(viewsets.ModelViewSet):
-    queryset = Promotion.objects.all()
-    serializer_class = PromotionSerializer
-    parser_classes = [MultiPartParser, FormParser]
+# class PromotionViewSet(viewsets.ModelViewSet):
+#     queryset = Promotion.objects.prefetch_related(
+#         "hotel_promotions__hotel",
+#         "flight_promotions__airport",
+#     ).all()
+#     serializer_class = PromotionSerializer
+#     parser_classes = [MultiPartParser, FormParser]
 
 
 # Promotion
@@ -19,7 +22,13 @@ class PromotionListCreateView(generics.ListCreateAPIView):
     serializer_class = PromotionSerializer
 
     def get_queryset(self):
-        queryset = Promotion.objects.all().order_by("-created_at")
+        now = timezone.now()
+        queryset = Promotion.objects.prefetch_related(
+            "hotel_promotions__hotel",
+            "flight_promotions__airport",
+        ).filter(end_date__gte=now) 
+        queryset = queryset.order_by("-created_at")
+        
         promotion_type = self.request.query_params.get("promotion_type")
         if promotion_type:
             queryset = queryset.filter(promotion_type=promotion_type)
@@ -27,8 +36,22 @@ class PromotionListCreateView(generics.ListCreateAPIView):
 
 
 class PromotionDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Promotion.objects.all()
+    queryset = Promotion.objects.prefetch_related(
+            "hotel_promotions__hotel",
+            "flight_promotions__airport",
+        ).all()
+
     serializer_class = PromotionSerializer
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        request = self.request
+
+        context["city_id"] = request.query_params.get("city_id")
+        # context["active_only"] = request.query_params.get("active_only", "true").lower() == "true"
+        context["min_rating"] = request.query_params.get("min_rating")
+        context["min_price"] = request.query_params.get("min_price")
+
+        return context
 
 
 # HotelPromotion
