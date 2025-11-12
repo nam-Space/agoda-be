@@ -55,41 +55,30 @@ class CountryListView(generics.ListAPIView):
     def get_queryset(self):
         queryset = Country.objects.all()
         filter_params = self.request.query_params
+
         query_filter = Q()
 
         for field, value in filter_params.items():
             if field not in ["pageSize", "current"]:
                 query_filter &= Q(**{f"{field}__icontains": value})
 
-        return queryset.filter(query_filter).order_by("id")
+        # Áp dụng lọc cho queryset
+        queryset = queryset.filter(query_filter)
 
-    def list(self, request, *args, **kwargs):
-        """
-        Override để cho phép trả về ALL nếu không có pageSize/current
-        """
-        page_size = request.query_params.get("pageSize")
-        current = request.query_params.get("current")
+        # Lấy tham số 'current' từ query string để tính toán trang
+        current = self.request.query_params.get(
+            "current", 1
+        )  # Trang hiện tại, mặc định là trang 1
+        page_size = self.request.query_params.get(
+            "pageSize", 10
+        )  # Số phần tử mỗi trang, mặc định là 10
 
-        queryset = self.get_queryset()
+        # Áp dụng phân trang
+        paginator = Paginator(queryset, page_size)
+        page = paginator.get_page(current)
 
-        # ⚡ Nếu có tham số phân trang thì dùng DRF pagination
-        if page_size or current:
-            page = self.paginate_queryset(queryset)
-            if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                return self.get_paginated_response(serializer.data)
+        return page
 
-        # ⚡ Nếu không có pageSize/current thì trả full list
-        serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            "isSuccess": True,
-            "message": "Fetched all countries successfully!",
-            "meta": {
-                "totalItems": queryset.count(),
-                "pagination": None
-            },
-            "data": serializer.data,
-        })
 
 # API GET chi tiết quốc gia
 class CountryDetailView(generics.RetrieveUpdateDestroyAPIView):
