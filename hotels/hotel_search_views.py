@@ -80,25 +80,26 @@ class HotelSearchAPI(APIView):
         
         return False
 
-
+from rooms.serializers import RoomSerializer
 class RoomAvailabilityAPI(APIView):
     """
     API: GET /api/hotels/<hotel_id>/rooms/availability/
-    Tìm phòng trống của 1 khách sạn cụ thể
-    Query params: check_in, check_out, adults
+    Lấy phòng trống dựa trên start_date, end_date trong Room
+    Query params: check_in, check_out, adults, rooms
     """
-    
+
     def get(self, request, hotel_id):
         check_in = request.query_params.get('check_in')
         check_out = request.query_params.get('check_out')
         adults = int(request.query_params.get('adults', 1))
-        
+        rooms_needed = int(request.query_params.get('rooms', 1))
+
         if not check_in or not check_out:
             return Response(
                 {"error": "Missing required parameters: check_in, check_out"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             check_in_date = datetime.strptime(check_in, '%Y-%m-%d').date()
             check_out_date = datetime.strptime(check_out, '%Y-%m-%d').date()
@@ -107,7 +108,7 @@ class RoomAvailabilityAPI(APIView):
                 {"error": "Invalid date format. Use YYYY-MM-DD"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             hotel = Hotel.objects.get(id=hotel_id)
         except Hotel.DoesNotExist:
@@ -115,38 +116,29 @@ class RoomAvailabilityAPI(APIView):
                 {"error": "Hotel not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
+        # Lọc phòng dựa trên start_date, end_date trong Room
         rooms = Room.objects.filter(
             hotel=hotel,
             available=True,
-            adults_capacity__gte=adults
+            adults_capacity__gte=adults,
+            available_rooms__gte=rooms_needed,
+            start_date__lte=check_in_date,
+            end_date__gte=check_out_date
         )
-        
-        available_rooms = []
+
         for room in rooms:
-            overlapping_bookings = RoomBookingDetail.objects.filter(
-                room=room,
-                check_in__lt=check_out_date,
-                check_out__gt=check_in_date
-            ).count()
-            
-            available_count = room.total_rooms - overlapping_bookings
-            
-            if available_count > 0:
-                room.rooms_available = available_count
-                available_rooms.append(room)
-        
-        from rooms.serializers import RoomSerializer
-        serializer = RoomSerializer(available_rooms, many=True)
-        
+            room.rooms_available = room.available_rooms
+
+        serializer = RoomSerializer(rooms, many=True)
         data = serializer.data
         for i, room_data in enumerate(data):
-            room_data['rooms_available'] = available_rooms[i].rooms_available
-        
+            room_data['rooms_available'] = rooms[i].rooms_available
+
         return Response({
             "isSuccess": True,
             "hotel_id": hotel_id,
             "hotel_name": hotel.name,
-            "total": len(available_rooms),
+            "total": len(rooms),
             "data": data
         })

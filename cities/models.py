@@ -12,6 +12,7 @@ class City(models.Model):
     description = models.TextField(blank=True, null=True)  # Trường description mới
     created_at = models.DateTimeField(auto_now_add=True)
     image = models.CharField(max_length=255, null=True, blank=True)
+    image_handbook = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
         return f"{self.name}, {self.country.name}"

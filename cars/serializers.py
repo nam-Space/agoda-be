@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Car, CarBookingDetail
+from .models import Car, CarBookingDetail, UserCarInteraction
 from accounts.serializers import UserSerializer
 from accounts.models import CustomUser
 
@@ -25,7 +25,6 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "description",
             "capacity",
             "luggage",
-            "point",
             "avg_star",
             "price_per_km",
             "avg_speed",
@@ -79,3 +78,20 @@ class CarBookingDetailCreateSerializer(serializers.ModelSerializer):
             "total_time_estimate",
             "passenger_quantity_booking",
         ]
+
+
+class UserCarInteractionSerializer(serializers.ModelSerializer):
+    car = CarSerializer(read_only=True)
+
+    class Meta:
+        model = UserCarInteraction
+        fields = "__all__"
+
+
+class UserCarInteractionCreateSerializer(serializers.ModelSerializer):
+    car = serializers.PrimaryKeyRelatedField(queryset=Car.objects.all())
+
+    class Meta:
+        model = UserCarInteraction
+        fields = "__all__"
+        read_only_fields = ["weighted_score", "last_interacted"]

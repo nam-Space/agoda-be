@@ -1,4 +1,3 @@
-from rest_framework import viewsets, permissions
 from .models import Review
 from .serializers import ReviewSerializer
 from rest_framework.permissions import IsAuthenticated
@@ -16,6 +15,7 @@ from hotels.models import Hotel, UserHotelInteraction
 from activities.models import Activity, UserActivityInteraction
 from django.db.models import Avg, Count
 from django.db import transaction
+from handbooks.models import Handbook, UserHandbookInteraction
 
 # Khởi tạo mô hình sentiment-analysis chỉ một lần
 _model_path = "5CD-AI/Vietnamese-Sentiment-visobert"
@@ -260,6 +260,26 @@ class ReviewCreateView(generics.CreateAPIView):
                 interaction.update_weighted_score()
                 interaction.save()
 
+        elif service_type == ServiceType.HANDBOOK:
+            handbook = update_service_stats(Handbook, ServiceType.HANDBOOK)
+
+            # ✅ Cập nhật hoặc tạo UserHandbookInteraction tương ứng
+            if handbook:
+                interaction, _ = UserHandbookInteraction.objects.get_or_create(
+                    user=request.user, handbook=handbook
+                )
+
+                if review.sentiment == "positive":
+                    interaction.positive_count += 1
+                elif review.sentiment == "negative":
+                    interaction.negative_count += 1
+                else:
+                    interaction.neutral_count += 1
+
+                # Cập nhật điểm trọng số cá nhân
+                interaction.update_weighted_score()
+                interaction.save()
+
         # =========================
         # 🔹 TRẢ VỀ KẾT QUẢ
         # =========================
@@ -347,7 +367,13 @@ class ReviewUpdateView(generics.UpdateAPIView):
             user=interaction.user,
             sentiment="positive",
             service_ref_id=getattr(
-                interaction, "hotel_id", getattr(interaction, "activity_id", None)
+                interaction,
+                "hotel_id",
+                getattr(
+                    interaction,
+                    "activity_id",
+                    getattr(interaction, "handbook_id", None),
+                ),
             ),
         ).count()
 
@@ -355,7 +381,13 @@ class ReviewUpdateView(generics.UpdateAPIView):
             user=interaction.user,
             sentiment="negative",
             service_ref_id=getattr(
-                interaction, "hotel_id", getattr(interaction, "activity_id", None)
+                interaction,
+                "hotel_id",
+                getattr(
+                    interaction,
+                    "activity_id",
+                    getattr(interaction, "handbook_id", None),
+                ),
             ),
         ).count()
 
@@ -363,7 +395,13 @@ class ReviewUpdateView(generics.UpdateAPIView):
             user=interaction.user,
             sentiment="neutral",
             service_ref_id=getattr(
-                interaction, "hotel_id", getattr(interaction, "activity_id", None)
+                interaction,
+                "hotel_id",
+                getattr(
+                    interaction,
+                    "activity_id",
+                    getattr(interaction, "handbook_id", None),
+                ),
             ),
         ).count()
 
@@ -418,6 +456,14 @@ class ReviewUpdateView(generics.UpdateAPIView):
             if activity:
                 interaction, _ = UserActivityInteraction.objects.get_or_create(
                     user=request.user, activity=activity
+                )
+                self.update_interaction(interaction, updated_review.sentiment)
+
+        elif service_type == ServiceType.HANDBOOK:  # ✅ thêm case này
+            handbook = self.update_service_stats(Handbook, ServiceType.HANDBOOK, ref_id)
+            if handbook:
+                interaction, _ = UserHandbookInteraction.objects.get_or_create(
+                    user=request.user, handbook=handbook
                 )
                 self.update_interaction(interaction, updated_review.sentiment)
 
@@ -522,6 +568,26 @@ class ReviewDeleteView(generics.DestroyAPIView):
             if activity:
                 interaction = UserActivityInteraction.objects.filter(
                     user=user, activity=activity
+                ).first()
+                if interaction:
+                    # Giảm số lượng sentiment tương ứng
+                    if old_sentiment == "positive" and interaction.positive_count > 0:
+                        interaction.positive_count -= 1
+                    elif old_sentiment == "negative" and interaction.negative_count > 0:
+                        interaction.negative_count -= 1
+                    elif old_sentiment == "neutral" and interaction.neutral_count > 0:
+                        interaction.neutral_count -= 1
+
+                    # Cập nhật lại điểm cá nhân hóa
+                    interaction.update_weighted_score()
+                    interaction.save()
+
+        elif service_type == ServiceType.HANDBOOK:
+            handbook = update_service_stats(Handbook, ServiceType.HANDBOOK, ref_id)
+
+            if handbook:
+                interaction = UserHandbookInteraction.objects.filter(
+                    user=user, handbook=handbook
                 ).first()
                 if interaction:
                     # Giảm số lượng sentiment tương ứng

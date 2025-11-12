@@ -24,4 +24,5 @@ class CityCreateSerializer(serializers.ModelSerializer):
             "description",
             "image",
             "country",
+            "image_handbook",
         ]  # Chỉ có những trường cần thiết

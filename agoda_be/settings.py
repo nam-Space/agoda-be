@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "travel_tips",
     "accommodationtype",
     "travelguide",
+    "handbooks",
 ]
 
 SIMPLE_JWT = {

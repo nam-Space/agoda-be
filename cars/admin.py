@@ -9,7 +9,6 @@ class CarAdmin(admin.ModelAdmin):
         "description",
         "capacity",
         "luggage",
-        "point",
         "avg_star",
         "avg_speed",
         "created_at",
