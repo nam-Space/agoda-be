@@ -37,6 +37,7 @@ class HandbookPagination(PageNumberPagination):
         city_id = request.query_params.get("city_id")
         country_id = request.query_params.get("country_id")
         category = request.query_params.get("category")
+        author_id = request.query_params.get("author_id")
 
         if city_id:
             self.filters["city_id"] = city_id
@@ -47,6 +48,9 @@ class HandbookPagination(PageNumberPagination):
         if category:
             self.filters["category"] = category
 
+        if author_id:
+            self.filters["author_id"] = author_id
+
         for field, value in request.query_params.items():
             if field not in [
                 "current",
@@ -56,6 +60,7 @@ class HandbookPagination(PageNumberPagination):
                 "city_id",
                 "country_id",
                 "category",
+                "author_id",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
@@ -133,6 +138,10 @@ class HandbookListView(generics.ListAPIView):
             except ValueError:
                 return Handbook.objects.none()
 
+        author_id = params.get("author_id")
+        if author_id:
+            queryset = queryset.filter(author_id=author_id)
+
         # ---- other filters ----
         q_filter = Q()
         for field, value in params.items():
@@ -144,6 +153,7 @@ class HandbookListView(generics.ListAPIView):
                 "city_id",
                 "country_id",
                 "category",
+                "author_id",
             ]:
                 if field in [f.name for f in Handbook._meta.get_fields()]:
                     q_filter &= Q(**{f"{field}__icontains": value})

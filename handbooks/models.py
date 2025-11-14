@@ -21,7 +21,13 @@ class Handbook(models.Model):
         ("airport", "Airport"),
         ("travel_information", "Travel Information"),
     ]
-
+    author = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        related_name="handbooks",
+        null=True,
+        blank=True,
+    )
     title = models.CharField(max_length=255, null=True, blank=True)
     city = models.ForeignKey(City, on_delete=models.CASCADE, related_name="cities")
     short_description = models.TextField(
