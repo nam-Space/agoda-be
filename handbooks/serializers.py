@@ -2,9 +2,12 @@ from rest_framework import serializers
 from .models import Handbook, UserHandbookInteraction
 from cities.models import City
 from cities.serializers import CitySerializer, CityCreateSerializer
+from accounts.models import CustomUser
+from accounts.serializers import UserSerializer
 
 
 class HandbookSerializer(serializers.ModelSerializer):
+    author = UserSerializer()
     city = CitySerializer()
 
     class Meta:
@@ -13,13 +16,14 @@ class HandbookSerializer(serializers.ModelSerializer):
 
 
 class HandbookCreateSerializer(serializers.ModelSerializer):
-    # Sử dụng PrimaryKeyRelatedField để nhận ID của thành phố
+    author = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all())
 
     class Meta:
         model = Handbook
         fields = [
             "id",
+            "author",
             "city",
             "title",
             "category",

@@ -273,6 +273,7 @@ class PaymentPagination(PageNumberPagination):
         )
         driver_id = request.query_params.get("driver_id")
         status = request.query_params.get("status")
+        activity_id = request.query_params.get("activity_id")
 
         if booking__service_type:
             self.filters["booking__service_type"] = booking__service_type
@@ -301,6 +302,11 @@ class PaymentPagination(PageNumberPagination):
         if status:
             self.filters["status"] = status
 
+        if activity_id:
+            self.filters[
+                "booking__activity_date_detail__activity_date__activity_package__activity_id"
+            ] = activity_id
+
         for field, value in request.query_params.items():
             if field not in [
                 "current",
@@ -312,6 +318,7 @@ class PaymentPagination(PageNumberPagination):
                 "driver_id",
                 "status",
                 "sort",
+                "activity_id",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
@@ -405,6 +412,13 @@ class PaymentListView(generics.ListAPIView):
                 status=status,
             )
 
+        activity_id = filter_params.get("activity_id")
+        if activity_id:
+            queryset = queryset.filter(
+                booking__activity_date_detail__activity_date__activity_package__activity_id=activity_id,
+                booking__service_type=ServiceType.ACTIVITY,
+            )
+
         for field, value in filter_params.items():
             if field not in [
                 "pageSize",
@@ -416,6 +430,7 @@ class PaymentListView(generics.ListAPIView):
                 "driver_id",
                 "status",
                 "sort",
+                "activity_id",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
@@ -573,7 +588,7 @@ class PaymentListOverviewView(generics.ListAPIView):
             labels.append(label)
             revenue = entry["total_revenue"] or 0
             revenues.append(revenue)
-            total += revenue
+            total = revenue
             customers.append(entry["customer_count"])
             orders.append(entry["order_count"])
 
