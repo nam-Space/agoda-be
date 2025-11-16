@@ -267,6 +267,7 @@ class PaymentPagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
         booking__service_type = request.query_params.get("booking__service_type")
         booking__service_ref_id = request.query_params.get("booking__service_ref_id")
+        booking__user_id = request.query_params.get("booking__user_id")
         owner_hotel_id = request.query_params.get("owner_hotel_id")
         event_organizer_activity_id = request.query_params.get(
             "event_organizer_activity_id"
@@ -274,12 +275,21 @@ class PaymentPagination(PageNumberPagination):
         driver_id = request.query_params.get("driver_id")
         status = request.query_params.get("status")
         activity_id = request.query_params.get("activity_id")
+        min_time_checkin_room = request.query_params.get("min_time_checkin_room")
+        max_time_checkin_room = request.query_params.get("max_time_checkin_room")
+        min_time_checkout_room = request.query_params.get("min_time_checkout_room")
+        max_time_checkout_room = request.query_params.get("max_time_checkout_room")
+        min_date_launch_activity = request.query_params.get("min_date_launch_activity")
+        max_date_launch_activity = request.query_params.get("max_date_launch_activity")
 
         if booking__service_type:
             self.filters["booking__service_type"] = booking__service_type
 
         if booking__service_ref_id:
             self.filters["booking__service_ref_id"] = booking__service_ref_id
+
+        if booking__user_id:
+            self.filters["booking__user_id"] = booking__user_id
 
         # ✅ Lưu filter theo owner_hotel_id (RoomBookingDetail)
         if owner_hotel_id:
@@ -307,18 +317,48 @@ class PaymentPagination(PageNumberPagination):
                 "booking__activity_date_detail__activity_date__activity_package__activity_id"
             ] = activity_id
 
+        if min_time_checkin_room:
+            self.filters["booking__hotel_detail__check_in__gte"] = min_time_checkin_room
+        if max_time_checkin_room:
+            self.filters["booking__hotel_detail__check_in__lte"] = max_time_checkin_room
+
+        if min_time_checkout_room:
+            self.filters["booking__hotel_detail__check_out__gte"] = (
+                min_time_checkout_room
+            )
+        if max_time_checkout_room:
+            self.filters["booking__hotel_detail__check_out__lte"] = (
+                max_time_checkout_room
+            )
+
+        if min_date_launch_activity:
+            self.filters["booking__activity_date_detail__date_launch__gte"] = (
+                min_date_launch_activity
+            )
+        if max_date_launch_activity:
+            self.filters["booking__activity_date_detail__date_launch__lte"] = (
+                max_date_launch_activity
+            )
+
         for field, value in request.query_params.items():
             if field not in [
                 "current",
                 "pageSize",
                 "booking__service_type",
                 "booking__service_ref_id",
+                "booking__user_id",
                 "owner_hotel_id",
                 "event_organizer_activity_id",
                 "driver_id",
                 "status",
                 "sort",
                 "activity_id",
+                "min_time_checkin_room",
+                "max_time_checkin_room",
+                "min_time_checkout_room",
+                "max_time_checkout_room",
+                "min_date_launch_activity",
+                "max_date_launch_activity",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
@@ -384,6 +424,10 @@ class PaymentListView(generics.ListAPIView):
         if booking__service_ref_id:
             query_filter &= Q(booking__service_ref_id=booking__service_ref_id)
 
+        booking__user_id = filter_params.get("booking__user_id")
+        if booking__user_id:
+            query_filter &= Q(booking__user_id=booking__user_id)
+
         # --- Lọc theo owner_hotel (truy ngược qua RoomBookingDetail) ---
         owner_hotel_id = filter_params.get("owner_hotel_id")
         if owner_hotel_id:
@@ -419,18 +463,85 @@ class PaymentListView(generics.ListAPIView):
                 booking__service_type=ServiceType.ACTIVITY,
             )
 
+        min_time_checkin_room = filter_params.get("min_time_checkin_room")
+        max_time_checkin_room = filter_params.get("max_time_checkin_room")
+
+        # 🔹 Lọc theo khoảng thời gian checkout phòng (từ - đến)
+        if min_time_checkin_room and max_time_checkin_room:
+            queryset = queryset.filter(
+                booking__hotel_detail__check_in__range=[
+                    min_time_checkin_room,
+                    max_time_checkin_room,
+                ]
+            )
+        elif min_time_checkin_room:
+            queryset = queryset.filter(
+                booking__hotel_detail__check_in__gte=min_time_checkin_room
+            )
+        elif max_time_checkin_room:
+            queryset = queryset.filter(
+                booking__hotel_detail__check_in__lte=max_time_checkin_room
+            )
+
+        min_time_checkout_room = filter_params.get("min_time_checkout_room")
+        max_time_checkout_room = filter_params.get("max_time_checkout_room")
+
+        # 🔹 Lọc theo khoảng thời gian checkout phòng (từ - đến)
+        if min_time_checkout_room and max_time_checkout_room:
+            queryset = queryset.filter(
+                booking__hotel_detail__check_out__range=[
+                    min_time_checkout_room,
+                    max_time_checkout_room,
+                ]
+            )
+        elif min_time_checkout_room:
+            queryset = queryset.filter(
+                booking__hotel_detail__check_out__gte=min_time_checkout_room
+            )
+        elif max_time_checkout_room:
+            queryset = queryset.filter(
+                booking__hotel_detail__check_out__lte=max_time_checkout_room
+            )
+
+        min_date_launch_activity = filter_params.get("min_date_launch_activity")
+        max_date_launch_activity = filter_params.get("max_date_launch_activity")
+
+        # 🔹 Lọc theo khoảng thời gian hoạt động activity (từ - đến)
+        if min_date_launch_activity and max_date_launch_activity:
+            queryset = queryset.filter(
+                booking__activity_date_detail__date_launch__range=[
+                    min_date_launch_activity,
+                    max_date_launch_activity,
+                ]
+            )
+        elif min_date_launch_activity:
+            queryset = queryset.filter(
+                booking__activity_date_detail__date_launch__gte=min_date_launch_activity
+            )
+        elif max_date_launch_activity:
+            queryset = queryset.filter(
+                booking__activity_date_detail__date_launch__lte=max_date_launch_activity
+            )
+
         for field, value in filter_params.items():
             if field not in [
                 "pageSize",
                 "current",
                 "booking__service_type",
                 "booking__service_ref_id",
+                "booking__user_id",
                 "owner_hotel_id",
                 "event_organizer_activity_id",
                 "driver_id",
                 "status",
                 "sort",
                 "activity_id",
+                "min_time_checkin_room",
+                "max_time_checkin_room",
+                "min_time_checkout_room",
+                "max_time_checkout_room",
+                "min_date_launch_activity",
+                "max_date_launch_activity",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
