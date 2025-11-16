@@ -132,8 +132,8 @@ class RoomBookingDetail(models.Model):
     room = models.ForeignKey(
         Room, on_delete=models.CASCADE, related_name="room_bookings"
     )
-    check_in = models.DateField()
-    check_out = models.DateField()
+    check_in = models.DateTimeField()
+    check_out = models.DateTimeField()
     num_guests = models.IntegerField()
     owner_hotel = models.ForeignKey(
         CustomUser,
