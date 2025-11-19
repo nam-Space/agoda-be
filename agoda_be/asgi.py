@@ -12,13 +12,14 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 from channels.security.websocket import AllowedHostsOriginValidator
 import chats.routing  # <-- Bây giờ mới an toàn để import
+from agoda_be.middleware import JWTAuthMiddleware
 
 # ⚙️ 4. Tạo ứng dụng ASGI
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
         "websocket": AllowedHostsOriginValidator(
-            AuthMiddlewareStack(URLRouter(chats.routing.websocket_urlpatterns))
+            JWTAuthMiddleware(URLRouter(chats.routing.websocket_urlpatterns))
         ),
     }
 )
