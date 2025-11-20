@@ -77,6 +77,24 @@ class CreateUserSerializer(serializers.ModelSerializer):
         return user
 
 
+class UserStaffSimpleSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = get_user_model()
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "avatar",
+            "role",
+            "gender",
+            "phone_number",
+            "birthday",
+        ]
+
+
 class UserSimpleSerializer(serializers.ModelSerializer):
     hotel = serializers.SerializerMethodField()
 
@@ -109,7 +127,7 @@ class UserSimpleSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     hotel = serializers.SerializerMethodField()
     manager = UserSimpleSerializer(read_only=True)  # quản lý
-    staffs = serializers.PrimaryKeyRelatedField(many=True, read_only=True)  # nhân viên
+    staffs = UserStaffSimpleSerializer(many=True, read_only=True)  # nhân viên
 
     class Meta:
         model = get_user_model()
