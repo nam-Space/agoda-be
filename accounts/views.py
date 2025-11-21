@@ -205,12 +205,15 @@ class UserPagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
 
         for field, value in request.query_params.items():
-            if field not in [
-                "current",
-                "pageSize",
-            ]:
+            if field not in ["current", "pageSize", "username", "email"]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
+
+            if field in ["username"]:
+                self.filters[f"username"] = value
+
+            if field in ["email"]:
+                self.filters[f"email"] = value
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
         try:
@@ -272,12 +275,21 @@ class UserListView(generics.ListAPIView):
 
         # Duyệt qua các tham số query để tạo bộ lọc cho mỗi trường
         for field, value in filter_params.items():
-            if (field != "current") and (
-                field != "pageSize"
+            if (
+                field != "current"
+                and field != "pageSize"
+                and field != "username"
+                and field != "email"
             ):  # Kiểm tra trường có tồn tại trong model CustomUser không
                 query_filter &= Q(
                     **{f"{field}__icontains": value}
                 )  # Thêm điều kiện lọc cho mỗi trường
+
+            if field in ["username"]:
+                query_filter &= Q(username=value)
+
+            if field in ["email"]:
+                query_filter &= Q(email=value)
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)

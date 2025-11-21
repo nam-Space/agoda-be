@@ -33,6 +33,13 @@ class CustomUser(AbstractUser):
         null=True,
         blank=True,
     )
+    hotel = models.ForeignKey(
+        "hotels.Hotel",
+        on_delete=models.SET_NULL,
+        related_name="staffs",
+        null=True,
+        blank=True,
+    )
 
     def __str__(self):
         return self.username

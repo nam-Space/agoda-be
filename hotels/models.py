@@ -1,7 +1,6 @@
 from django.db import models
 from cities.models import City
 from django.db.models import Avg
-from accounts.models import CustomUser
 import math
 
 
@@ -9,10 +8,10 @@ class Hotel(models.Model):
     city = models.ForeignKey(
         City, on_delete=models.CASCADE, related_name="hotels", null=True
     )
-    owner = models.OneToOneField(
-        CustomUser,
+    owner = models.ForeignKey(
+        "accounts.CustomUser",
         on_delete=models.SET_NULL,
-        related_name="hotel",
+        related_name="hotels",
         null=True,
         blank=True,
     )
@@ -103,7 +102,9 @@ class HotelImage(models.Model):
 
 class UserHotelInteraction(models.Model):
     user = models.ForeignKey(
-        CustomUser, on_delete=models.CASCADE, related_name="user_hotel_interactions"
+        "accounts.CustomUser",
+        on_delete=models.CASCADE,
+        related_name="user_hotel_interactions",
     )
     hotel = models.ForeignKey(
         Hotel, on_delete=models.CASCADE, related_name="user_hotel_interactions"
