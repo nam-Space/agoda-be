@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "travel_tips",
     "accommodationtype",
     "travelguide",
+    "handbooks",
 ]
 
 SIMPLE_JWT = {
@@ -225,3 +226,11 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
 STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET")
 STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY")
+
+FRONT_END_URL = config("FRONT_END_URL")
+ADMIN_URL = config("ADMIN_URL")
+
+# SESSION_COOKIE_SECURE = False
+# CSRF_COOKIE_SECURE = False
+# SESSION_COOKIE_SAMESITE = "None"
+# CSRF_COOKIE_SAMESITE = "None"

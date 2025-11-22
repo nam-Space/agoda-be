@@ -19,20 +19,52 @@ from rest_framework import status
 class CityPagination(PageNumberPagination):
     page_size = 10  # Default value
     currentPage = 1
+    filters = {}
 
     def get_page_size(self, request):
-        self.page_size = int(request.query_params.get("pageSize", 10))
-        self.currentPage = int(request.query_params.get("current", 1))
+        # Lấy giá trị pageSize từ query string, nếu có
+        page_size = request.query_params.get("pageSize")
+        currentPage = request.query_params.get("current")
+        country_id = request.query_params.get("country_id")
+
+        if country_id:
+            self.filters["country_id"] = country_id
+
+        for field, value in request.query_params.items():
+            if field not in [
+                "current",
+                "pageSize",
+                "country_id",
+            ]:
+                # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
+                self.filters[f"{field}__icontains"] = value
+
+        # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
+        try:
+            self.page_size = int(page_size) if page_size is not None else self.page_size
+        except (ValueError, TypeError):
+            self.page_size = self.page_size
+
+        try:
+            self.currentPage = (
+                int(currentPage) if currentPage is not None else self.currentPage
+            )
+        except (ValueError, TypeError):
+            self.currentPage = self.currentPage
+
         return self.page_size
 
     def get_paginated_response(self, data):
-        total_count = City.objects.all().count()
+
+        total_count = City.objects.filter(**self.filters).count()
         total_pages = math.ceil(total_count / self.page_size)
+
+        self.filters.clear()
 
         return Response(
             {
                 "isSuccess": True,
-                "message": "Fetched cities successfully!",
+                "message": "Fetched city successfully!",
                 "meta": {
                     "totalItems": total_count,
                     "currentPage": self.currentPage,
@@ -61,7 +93,16 @@ class CityListView(generics.ListAPIView):
             queryset = queryset.filter(country_id=country_id)
 
         # Lọc dữ liệu theo query params
-        filter_params = self.request.query_params
+        params = self.request.query_params
+
+        country_id = params.get("country_id")
+        if country_id:
+            try:
+                country_id = int(country_id)
+                queryset = queryset.filter(country_id=country_id)
+            except ValueError:
+                return City.objects.none()
+
         query_filter = Q()
 
         for field, value in filter_params.items():

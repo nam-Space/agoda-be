@@ -9,3 +9,4 @@ class ServiceType(models.IntegerChoices):
         "Flight",
     )
     ACTIVITY = (4, "Activity")
+    HANDBOOK = (5, "Handbook")
