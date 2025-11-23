@@ -4,7 +4,7 @@ class PromotionType(models.IntegerChoices):
     HOTEL = 1, "Chỗ ở"
     FLIGHT = 2, "Chuyến bay"
     ACTIVITY = 3, "Hoạt động"
-
+    CAR = 4, "Xe"
 
 class Promotion(models.Model):
     title = models.CharField(max_length=255)
@@ -21,7 +21,7 @@ class Promotion(models.Model):
     )
 
     image = models.ImageField(
-        upload_to='promotions/',  # folder lưu file trong MEDIA_ROOT
+        upload_to='promotions_images/',  # folder lưu file trong MEDIA_ROOT
         blank=True,
         null=True
     )
@@ -32,33 +32,58 @@ class Promotion(models.Model):
         return f"{self.title} ({self.get_promotion_type_display()})"
 
 
-class HotelPromotion(models.Model):
-    promotion = models.ForeignKey(Promotion, on_delete=models.CASCADE, related_name="hotel_promotions")
-    hotel = models.ForeignKey("hotels.Hotel", on_delete=models.CASCADE, related_name="promotions")
-
-    # Cho phép khách sạn tùy chỉnh
-    custom_discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    custom_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.promotion.title} -> Hotel: {self.hotel.name}"
-
-
 class FlightPromotion(models.Model):
-    promotion = models.ForeignKey(Promotion, on_delete=models.CASCADE, related_name="flight_promotions")
-    airport = models.ForeignKey("airports.Airport", on_delete=models.CASCADE, related_name="promotions")
-
-    # Cho phép sân bay tùy chỉnh
-    custom_discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    custom_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    promotion = models.ForeignKey(
+        Promotion, on_delete=models.CASCADE, related_name="flight_promotions"
+    )
+    flight = models.ForeignKey("flights.Flight", on_delete=models.CASCADE, related_name="promotions"
+    , null=True, blank=True,
+    )
+    
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.promotion.title} -> Flight: {self.airport.name}"
+        return f"{self.promotion.title} -> Flight: {self.flight_id if self.flight else 'N/A'}"
+
+class ActivityPromotion(models.Model):
+    promotion = models.ForeignKey(
+        Promotion, on_delete=models.CASCADE, related_name="activity_promotions"
+    )
+    activity = models.ForeignKey("activities.Activity", on_delete=models.CASCADE, related_name="promotions"
+    , null=True, blank=True,
+    )
+
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.promotion.title} -> Activity: {self.activity.name}"
 
 
-# class ActivityPromotion(models.Model):
-#     promotion = models.ForeignKey(Promotion, on_delete=models.CASCADE, related_name="activity_promotions")
-#     activity = models.ForeignKey("activities.Activity", on_delete=models.CASCADE, related_name="promotions")
+class RoomPromotion(models.Model):
+    promotion = models.ForeignKey(Promotion, on_delete=models.CASCADE, related_name="room_promotions")
+    room = models.ForeignKey("rooms.Room", on_delete=models.CASCADE, related_name="promotions")
 
-#     def __str__(self):
-#         return f"{self.promotion.title} -> Activity: {self.activity.name}"
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.promotion.title} -> Room: {self.room.room_type}"
+
+
+class CarPromotion(models.Model):
+    promotion = models.ForeignKey(
+        Promotion, on_delete=models.CASCADE, related_name="car_promotions"
+    )
+    car = models.ForeignKey("cars.Car", on_delete=models.CASCADE, related_name="promotions"
+    , null=True, blank=True,
+    )
+
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.promotion.title} -> Car: {self.car.name if self.car else 'N/A'}"
+
+

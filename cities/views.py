@@ -103,13 +103,11 @@ class CityListView(generics.ListAPIView):
             except ValueError:
                 return City.objects.none()
 
+
         query_filter = Q()
-
-        for field, value in filter_params.items():
-            if field not in ["pageSize", "current", "country_id"]:  # Bỏ qua các trường phân trang
+        for field, value in params.items():
+            if field not in ["pageSize", "current", "country_id"]:
                 query_filter &= Q(**{f"{field}__icontains": value})
-
-        # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
 
         # Lấy tham số 'current' từ query string để tính toán trang

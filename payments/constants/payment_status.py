@@ -6,4 +6,5 @@ class PaymentStatus(models.IntegerChoices):
     FAILED = 3, 'Failed'
     CANCELLED = 4, 'Cancelled'
     UNPAID = 5, 'Unpaid'         
-    PAID = 6, 'Paid' 
+    PAID = 6, 'Paid'
+    REFUNDED = 7, 'Refunded' 

@@ -13,16 +13,24 @@ class RoomImageSerializer(serializers.ModelSerializer):
 class RoomSerializer(serializers.ModelSerializer):
     hotel = HotelCreateSerializer(read_only=True)
     images = RoomImageSerializer(many=True, read_only=True)
+    promotion = serializers.SerializerMethodField()
+    has_promotion = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
         fields = "__all__"
 
+    def get_promotion(self, obj):
+        return obj.get_active_promotion()
+
+    def get_has_promotion(self, obj):
+        return obj.get_active_promotion() is not None
 
 class RoomAmenitySerializer(serializers.ModelSerializer):
     class Meta:
         model = RoomAmenity
         fields = ["id", "name"]
+
 
 
 class RoomBookingDetailSerializer(serializers.ModelSerializer):
@@ -31,7 +39,20 @@ class RoomBookingDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RoomBookingDetail
-        fields = ["id", "room", "check_in", "check_out", "num_guests", "owner_hotel"]
+        fields = [
+            "id",
+            "room",
+            "check_in",
+            "check_out",
+            "num_guests",
+            "room_type",
+            "room_count",
+            "owner_hotel",
+            "total_price",
+            "discount_amount",
+            "final_price",
+        ]
+
 
 
 class RoomBookingDetailCreateSerializer(serializers.ModelSerializer):
@@ -39,4 +60,4 @@ class RoomBookingDetailCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RoomBookingDetail
-        fields = ["id", "room", "check_in", "check_out", "num_guests"]
+        fields = ["id", "room", "check_in", "check_out", "num_guests", "room_type", "room_count"]

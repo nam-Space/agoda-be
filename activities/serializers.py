@@ -14,11 +14,32 @@ from accounts.models import CustomUser
 
 
 class ActivityDateSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = ActivityDate
         fields = "__all__"
 
+class ActivitySimpleSerializer(serializers.ModelSerializer):
+    thumbnail = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Activity
+        fields = [
+            "id",
+            "name",
+            "category",
+            "thumbnail",
+            "avg_price",
+            "avg_star",
+            "review_count",
+            "total_time",
+            "city",
+        ]
+
+    def get_thumbnail(self, obj):
+        first_image = obj.images.first()
+        if first_image:
+            return first_image.image  # hoặc full URL nếu cần
+        return None
 
 class ActivityPackagesListSerializer(serializers.ModelSerializer):
     activities_dates = ActivityDateSerializer(many=True, read_only=True)
@@ -41,21 +62,35 @@ class ActivitySerializer(serializers.ModelSerializer):
     images = ActivityImageSerializer(many=True, read_only=True)
     city = CityCreateSerializer(read_only=True)
     event_organizer = UserSerializer(read_only=True)
+    promotion = serializers.SerializerMethodField()
+    has_promotion = serializers.SerializerMethodField()
 
     class Meta:
         model = Activity
         fields = "__all__"
+    
+    def get_promotion(self, obj):
+        return obj.get_active_promotion()
 
+    def get_has_promotion(self, obj):
+        return obj.get_active_promotion() is not None
 
 class ActivityDetailSerializer(serializers.ModelSerializer):
     images = ActivityImageSerializer(many=True, read_only=True)
     city = CityCreateSerializer(read_only=True)
     activities_packages = ActivityPackagesListSerializer(many=True, read_only=True)
+    promotion = serializers.SerializerMethodField()
+    has_promotion = serializers.SerializerMethodField()
 
     class Meta:
         model = Activity
         fields = "__all__"
+        
+    def get_promotion(self, obj):
+        return obj.get_active_promotion()
 
+    def get_has_promotion(self, obj):
+        return obj.get_active_promotion() is not None
 
 class ActivityCreateSerializer(serializers.ModelSerializer):
     # Sử dụng PrimaryKeyRelatedField để nhận ID của hoạt động
@@ -191,6 +226,10 @@ class ActivityDateBookingDetailSerializer(serializers.ModelSerializer):
 
     event_organizer_activity = UserSerializer(read_only=True)
 
+    total_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    discount_amount = serializers.FloatField(read_only=True)
+    final_price = serializers.FloatField(read_only=True)
+
     class Meta:
         model = ActivityDateBookingDetail
         fields = [
@@ -210,7 +249,10 @@ class ActivityDateBookingDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "event_organizer_activity",
-        ]  # Chỉ có những trường cần thiết
+            "total_price",
+            "discount_amount",
+            "final_price",
+        ]
 
 
 class ActivityDateBookingCreateSerializer(serializers.ModelSerializer):

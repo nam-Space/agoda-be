@@ -18,12 +18,20 @@ class AirportPagination(PageNumberPagination):
 
     def get_page_size(self, request):
         # Lấy giá trị pageSize từ query string, nếu có
-        page_size = request.query_params.get("pageSize")
-        currentPage = request.query_params.get("current")
+        page_size = request.query_params.get("pageSize", "10")
+        currentPage = request.query_params.get("current", "1")
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
-        self.page_size = int(page_size)
-        self.currentPage = int(currentPage)
+        try:
+            self.page_size = int(page_size)
+        except (ValueError, TypeError):
+            self.page_size = 10
+        
+        try:
+            self.currentPage = int(currentPage)
+        except (ValueError, TypeError):
+            self.currentPage = 1
+            
         return self.page_size
 
     def get_paginated_response(self, data):
@@ -49,9 +57,50 @@ class AirportPagination(PageNumberPagination):
 class AirportListView(generics.ListAPIView):
     queryset = Airport.objects.all()
     serializer_class = AirportSerializer
-    pagination_class = AirportPagination
     authentication_classes = []  # Bỏ qua tất cả các lớp xác thực
     permission_classes = []  # Không cần kiểm tra quyền
+
+    def get_paginated_response(self, data):
+        # Custom response khi có phân trang
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched airports successfully!",
+                "meta": self.paginator.get_paginated_response_meta(data) if hasattr(self, 'paginator') else None,
+                "data": data,
+            }
+        )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        # Nếu không truyền current hoặc pageSize thì trả về tất cả
+        has_pagination = request.query_params.get("current") or request.query_params.get("pageSize")
+        
+        if not has_pagination:
+            # Không phân trang, trả về tất cả
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "Fetched all airports successfully!",
+                    "meta": {
+                        "totalItems": queryset.count(),
+                        "pagination": None
+                    },
+                    "data": serializer.data,
+                }
+            )
+        
+        # Có phân trang
+        self.pagination_class = AirportPagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def get_queryset(self):
         queryset = Airport.objects.all()
@@ -66,20 +115,8 @@ class AirportListView(generics.ListAPIView):
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
-
-        # Lấy tham số 'current' từ query string để tính toán trang
-        current = self.request.query_params.get(
-            "current", 1
-        )  # Trang hiện tại, mặc định là trang 1
-        page_size = self.request.query_params.get(
-            "pageSize", 10
-        )  # Số phần tử mỗi trang, mặc định là 10
-
-        # Áp dụng phân trang
-        paginator = Paginator(queryset, page_size)
-        page = paginator.get_page(current)
-
-        return page
+        
+        return queryset
 
 
 # API GET chi tiết sân bay
