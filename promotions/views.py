@@ -1,3 +1,4 @@
+from rest_framework.pagination import PageNumberPagination
 from rest_framework import generics, status
 from rest_framework.response import Response
 from .models import Promotion, FlightPromotion, ActivityPromotion, RoomPromotion, CarPromotion, PromotionType
@@ -10,10 +11,27 @@ from cars.models import Car
 from airlines.models import Airline
 from django.utils import timezone
 
+class PromotionCommonPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
-# Promotion
+    def get_paginated_response(self, data):
+        return Response({
+            "isSuccess": True,
+            "message": self.context.get('message', "Fetched promotions successfully!"),
+            "meta": {
+                "totalItems": self.page.paginator.count,
+                "currentPage": self.page.number,
+                "itemsPerPage": self.get_page_size(self.request),
+                "totalPages": self.page.paginator.num_pages,
+            },
+            "data": data,
+        })
+
 class PromotionListCreateView(generics.ListCreateAPIView):
     serializer_class = PromotionSerializer
+    pagination_class = PromotionCommonPagination
 
     def get_queryset(self):
         now = timezone.now()
@@ -22,13 +40,30 @@ class PromotionListCreateView(generics.ListCreateAPIView):
             "activity_promotions__activity_date",
             "room_promotions__room__hotel",
             "car_promotions__car",
-        ).filter(end_date__gte=now) 
-        queryset = queryset.order_by("-created_at")
+        ).filter(end_date__gte=now).order_by("-id")
         
         promotion_type = self.request.query_params.get("promotion_type")
         if promotion_type:
             queryset = queryset.filter(promotion_type=promotion_type)
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            self.paginator.context = {'message': "Fetched promotions successfully!"}
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "isSuccess": True,
+            "message": "Fetched promotions successfully!",
+            "meta": {
+                "totalItems": len(queryset),
+                "pagination": None
+            },
+            "data": serializer.data,
+        })
 
 
 class PromotionDetailView(generics.RetrieveUpdateDestroyAPIView):

@@ -1,30 +1,56 @@
+from rest_framework.pagination import PageNumberPagination
 from rest_framework import generics
 from .models import Airline, Aircraft
 from .serializers import AirlineSerializer, AircraftSerializer
 from rest_framework.response import Response
 from rest_framework import status
 
+# Phân trang chung cho Airline và Aircraft
+class CommonPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+    def get_paginated_response(self, data):
+        return Response({
+            "isSuccess": True,
+            "message": self.context.get('message', "Fetched data successfully!"),
+            "meta": {
+                "totalItems": self.page.paginator.count,
+                "currentPage": self.page.number,
+                "itemsPerPage": self.get_page_size(self.request),
+                "totalPages": self.page.paginator.num_pages,
+            },
+            "data": data,
+        })
 
 class AirlineListView(generics.ListCreateAPIView):
-    queryset = Airline.objects.all()
     serializer_class = AirlineSerializer
     authentication_classes = []
     permission_classes = []
+    pagination_class = CommonPagination
+
+    def get_queryset(self):
+        return Airline.objects.all().order_by('-id')
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            # Truyền message vào context để phân trang trả về đúng message
+            self.paginator.context = {'message': "Fetched all airlines successfully!"}
+            return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
-        return Response(
-            {
-                "isSuccess": True,
-                "message": "Fetched all airlines successfully!",
-                "meta": {
-                    "totalItems": queryset.count(),
-                    "pagination": None
-                },
-                "data": serializer.data,
-            }
-        )
+        return Response({
+            "isSuccess": True,
+            "message": "Fetched all airlines successfully!",
+            "meta": {
+                "totalItems": queryset.count(),
+                "pagination": None
+            },
+            "data": serializer.data,
+        })
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -66,14 +92,15 @@ class AirlineDetailView(generics.RetrieveAPIView):
         )
 
 
+
 class AircraftListView(generics.ListCreateAPIView):
-    queryset = Aircraft.objects.select_related('airline').all()
     serializer_class = AircraftSerializer
     authentication_classes = []
     permission_classes = []
+    pagination_class = CommonPagination
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = Aircraft.objects.select_related('airline').all().order_by('-created_at')
         airline_id = self.request.query_params.get('airline_id')
         if airline_id:
             queryset = queryset.filter(airline_id=airline_id)
@@ -81,18 +108,21 @@ class AircraftListView(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            self.paginator.context = {'message': "Fetched all aircrafts successfully!"}
+            return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
-        return Response(
-            {
-                "isSuccess": True,
-                "message": "Fetched all aircrafts successfully!",
-                "meta": {
-                    "totalItems": queryset.count(),
-                    "pagination": None
-                },
-                "data": serializer.data,
-            }
-        )
+        return Response({
+            "isSuccess": True,
+            "message": "Fetched all aircrafts successfully!",
+            "meta": {
+                "totalItems": queryset.count(),
+                "pagination": None
+            },
+            "data": serializer.data,
+        })
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

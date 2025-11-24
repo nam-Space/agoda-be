@@ -1,4 +1,4 @@
-# bookings/views.py
+from rest_framework.pagination import PageNumberPagination
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -36,15 +36,34 @@ from datetime import datetime, timedelta
 import stripe
 from django.conf import settings
 
+# Phân trang chung cho Booking và RefundPolicy
+class BookingCommonPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+    def get_paginated_response(self, data):
+        return Response({
+            "isSuccess": True,
+            "message": self.context.get('message', "Fetched data successfully!"),
+            "meta": {
+                "totalItems": self.page.paginator.count,
+                "currentPage": self.page.number,
+                "itemsPerPage": self.get_page_size(self.request),
+                "totalPages": self.page.paginator.num_pages,
+            },
+            "data": data,
+        })
 
 class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = []  # Không cần kiểm tra quyền
+    pagination_class = BookingCommonPagination
 
     def get_queryset(self):
-        queryset = Booking.objects.all().order_by("-created_at")
+        queryset = Booking.objects.all().order_by("-id")
         # Lọc theo email của user hoặc guest_info
         email = self.request.query_params.get("email")
         if email:
@@ -55,8 +74,25 @@ class BookingViewSet(viewsets.ModelViewSet):
         service_type = self.request.query_params.get("service_type")
         if service_type:
             queryset = queryset.filter(service_type=service_type)
-
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            self.paginator.context = {'message': "Fetched all bookings successfully!"}
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "isSuccess": True,
+            "message": "Fetched all bookings successfully!",
+            "meta": {
+                "totalItems": queryset.count(),
+                "pagination": None
+            },
+            "data": serializer.data,
+        })
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -503,27 +539,45 @@ class BookingViewSet(viewsets.ModelViewSet):
         )
 
 
+
 class RefundPolicyViewSet(viewsets.ModelViewSet):
     """API CRUD cho RefundPolicy"""
     queryset = RefundPolicy.objects.all()
     serializer_class = RefundPolicySerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = []  # Có thể thêm permission sau
+    pagination_class = BookingCommonPagination
 
     def get_queryset(self):
-        queryset = RefundPolicy.objects.all().order_by("-created_at")
+        queryset = RefundPolicy.objects.all().order_by("-id")
         # Lọc theo service_type
         service_type = self.request.query_params.get("service_type")
         if service_type:
             queryset = queryset.filter(service_type=service_type)
-        
         # Lọc theo is_active
         is_active = self.request.query_params.get("is_active")
         if is_active is not None:
             is_active_bool = is_active.lower() == "true"
             queryset = queryset.filter(is_active=is_active_bool)
-        
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            self.paginator.context = {'message': "Fetched all refund policies successfully!"}
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "isSuccess": True,
+            "message": "Fetched all refund policies successfully!",
+            "meta": {
+                "totalItems": queryset.count(),
+                "pagination": None
+            },
+            "data": serializer.data,
+        })
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
