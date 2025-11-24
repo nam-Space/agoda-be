@@ -264,7 +264,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                             <div class='flex-grow'>
                                 <h3 class='text-gray-900 mb-[6px] leading-[18px]'>
                                     <div>Mã:<span class='text-blue-500 font-semibold'> {booking.booking_code}</span></div>
-                                    <span>Khách hàng </span><span className="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.hotel_detail.room.hotel.name}</span> - <span>{booking.hotel_detail.room.room_type}</span>
+                                    <span>Khách hàng </span><span class="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.hotel_detail.room.hotel.name}</span> - <span>{booking.hotel_detail.room.room_type}</span>
                                 </h3>
                                 <div class='flex gap-[20px]'>
                                     <div class="flex items-center gap-[4px]">
@@ -299,7 +299,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                 <div class='flex-grow'>
                                     <h3 class='text-gray-900 mb-[6px] leading-[18px]'>
                                         <div>Mã:<span class='text-blue-500 font-semibold'> {booking.booking_code}</span></div>
-                                        <span>Khách hàng </span><span className="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.hotel_detail.room.hotel.name}</span> - <span>{booking.hotel_detail.room.room_type}</span>
+                                        <span>Khách hàng </span><span class="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.hotel_detail.room.hotel.name}</span> - <span>{booking.hotel_detail.room.room_type}</span>
                                     </h3>
                                     <div class='flex gap-[20px]'>
                                         <div class="flex items-center gap-[4px]">
@@ -336,7 +336,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                 <div class='flex-grow'>
                                     <h3 class='text-gray-900 mb-[6px] leading-[18px]'>
                                         <div>Mã:<span class='text-blue-500 font-semibold'> {booking.booking_code}</span></div>
-                                        <span>Khách hàng </span><span className="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.hotel_detail.room.hotel.name}</span> - <span>{booking.hotel_detail.room.room_type}</span>
+                                        <span>Khách hàng </span><span class="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.hotel_detail.room.hotel.name}</span> - <span>{booking.hotel_detail.room.room_type}</span>
                                     </h3>
                                     <div class='flex gap-[20px]'>
                                         <div class="flex items-center gap-[4px]">
@@ -490,7 +490,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                             <div class='flex-grow'>
                                 <h3 class='text-gray-900 mb-[6px] leading-[18px]'>
                                     <div>Mã:<span class='text-blue-500 font-semibold'> {booking.booking_code}</span></div>
-                                    <span>Khách hàng </span><span className="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.car_detail.car.name}</span> <span>({booking.car_detail.pickup_location} → {booking.car_detail.dropoff_location})</span>
+                                    <span>Khách hàng </span><span class="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.car_detail.car.name}</span> <span>({booking.car_detail.pickup_location} → {booking.car_detail.dropoff_location})</span>
                                 </h3>
                                 <div class='flex gap-[20px]'>
                                     <div class="flex items-center gap-[4px]">
@@ -528,7 +528,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                 <div class='flex-grow'>
                                     <h3 class='text-gray-900 mb-[6px] leading-[18px]'>
                                         <div>Mã:<span class='text-blue-500 font-semibold'> {booking.booking_code}</span></div>
-                                        <span>Khách hàng </span><span className="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.car_detail.car.name}</span> <span>({booking.car_detail.pickup_location} → {booking.car_detail.dropoff_location})</span>
+                                        <span>Khách hàng </span><span class="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.car_detail.car.name}</span> <span>({booking.car_detail.pickup_location} → {booking.car_detail.dropoff_location})</span>
                                     </h3>
                                     <div class='flex gap-[20px]'>
                                         <div class="flex items-center gap-[4px]">
@@ -683,7 +683,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                             <div class='flex-grow'>
                                 <h3 class='text-gray-900 mb-[6px] leading-[18px]'>
                                     <div>Mã:<span class='text-blue-500 font-semibold'> {booking.booking_code}</span></div>
-                                    <span>Khách hàng </span><span className="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.activity_date_detail.activity_name}</span> - <span>{booking.activity_date_detail.activity_package_name}</span>
+                                    <span>Khách hàng </span><span class="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.activity_date_detail.activity_name}</span> - <span>{booking.activity_date_detail.activity_package_name}</span>
                                 </h3>
                                 <div class='flex gap-[20px]'>
                                     <div class="flex items-center gap-[4px]">
@@ -720,7 +720,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                 <div class='flex-grow'>
                                     <h3 class='text-gray-900 mb-[6px] leading-[18px]'>
                                         <div>Mã:<span class='text-blue-500 font-semibold'> {booking.booking_code}</span></div>
-                                        <span>Khách hàng </span><span className="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.activity_date_detail.activity_name}</span> - <span>{booking.activity_date_detail.activity_package_name}</span>
+                                        <span>Khách hàng </span><span class="font-bold text-blue-700">{booking.guest_info.full_name} </span><span>đã đặt: </span><span class='font-bold'>{booking.activity_date_detail.activity_name}</span> - <span>{booking.activity_date_detail.activity_package_name}</span>
                                     </h3>
                                     <div class='flex gap-[20px]'>
                                         <div class="flex items-center gap-[4px]">
