@@ -13,7 +13,8 @@ from django.utils import timezone
 
 class PromotionCommonPagination(PageNumberPagination):
     page_size = 10
-    page_size_query_param = 'page_size'
+    page_query_param = 'current'        
+    page_size_query_param = 'pageSize'   
     max_page_size = 100
 
     def get_paginated_response(self, data):

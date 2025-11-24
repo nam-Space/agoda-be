@@ -39,7 +39,8 @@ from django.conf import settings
 # Phân trang chung cho Booking và RefundPolicy
 class BookingCommonPagination(PageNumberPagination):
     page_size = 10
-    page_size_query_param = 'page_size'
+    page_query_param = 'current'         
+    page_size_query_param = 'pageSize'   
     max_page_size = 100
 
     def get_paginated_response(self, data):
