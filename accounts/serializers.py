@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
-# from hotels.serializers import HotelSerializer
+from hotels.models import Hotel
 
 
 # Serializer cho việc đăng ký người dùng mới
@@ -96,7 +96,7 @@ class UserStaffSimpleSerializer(serializers.ModelSerializer):
 
 
 class UserSimpleSerializer(serializers.ModelSerializer):
-    hotel = serializers.SerializerMethodField()
+    # hotel = serializers.SerializerMethodField()
 
     class Meta:
         model = get_user_model()
@@ -111,20 +111,21 @@ class UserSimpleSerializer(serializers.ModelSerializer):
             "gender",
             "phone_number",
             "birthday",
-            "hotel",
+            # "hotel",
         ]
 
-    def get_hotel(self, obj):
-        # import lazy để tránh circular import
-        from hotels.serializers import HotelSimpleSerializer
+    # def get_hotel(self, obj):
+    #     # import lazy để tránh circular import
+    #     from hotels.serializers import HotelSimpleSerializer
 
-        if hasattr(obj, "hotel") and obj.hotel:
-            return HotelSimpleSerializer(obj.hotel).data
-        return None
+    #     if hasattr(obj, "hotel") and obj.hotel:
+    #         return HotelSimpleSerializer(obj.hotel).data
+    #     return None
 
 
 # Serializer cho thông tin người dùng
 class UserSerializer(serializers.ModelSerializer):
+    # hotel = serializers.SerializerMethodField()
     hotel = serializers.SerializerMethodField()
     manager = UserSimpleSerializer(read_only=True)  # quản lý
     staffs = UserStaffSimpleSerializer(many=True, read_only=True)  # nhân viên
@@ -165,6 +166,9 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
     manager = serializers.PrimaryKeyRelatedField(
         queryset=get_user_model().objects.all(), required=False, allow_null=True
     )
+    hotel = serializers.PrimaryKeyRelatedField(
+        queryset=Hotel.objects.all(), required=False, allow_null=True
+    )
 
     class Meta:
         model = get_user_model()
@@ -183,10 +187,12 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
             "date_joined",
             "password",
             "manager",
+            "hotel",
         ]
         extra_kwargs = {
             "birthday": {"required": False},
             "manager": {"required": False},
+            "hotel": {"required": False},
         }
 
     def update(self, instance, validated_data):

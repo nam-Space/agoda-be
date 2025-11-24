@@ -2,8 +2,10 @@ from rest_framework import serializers
 from .models import Hotel, HotelImage, UserHotelInteraction
 from cities.models import City
 from cities.serializers import CityCreateSerializer, CitySerializer
-from accounts.serializers import UserSerializer
-from accounts.models import CustomUser
+from django.contrib.auth import get_user_model
+
+# from accounts.serializers import UserSerializer
+# from accounts.models import CustomUser
 
 
 class HotelImageSerializer(serializers.ModelSerializer):
@@ -30,7 +32,7 @@ class HotelSimpleSerializer(serializers.ModelSerializer):
 class HotelSerializer(serializers.ModelSerializer):
     images = HotelImageSerializer(many=True, read_only=True)
     city = CityCreateSerializer(read_only=True)
-    owner = UserSerializer(read_only=True)
+    owner = serializers.SerializerMethodField()
     city_id = serializers.IntegerField(source="city.id", read_only=True)
     min_price = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True
@@ -40,12 +42,17 @@ class HotelSerializer(serializers.ModelSerializer):
         model = Hotel
         fields = "__all__"
 
+    def get_owner(self, obj):
+        from accounts.serializers import UserSerializer
+
+        return UserSerializer(obj.owner).data if obj.owner else None
+
 
 class HotelCreateSerializer(serializers.ModelSerializer):
     # Sử dụng PrimaryKeyRelatedField để nhận ID của thành phố
     city = serializers.PrimaryKeyRelatedField(queryset=City.objects.all())
     owner = serializers.PrimaryKeyRelatedField(
-        queryset=CustomUser.objects.all(),
+        queryset=get_user_model().objects.all(),
         required=False,  # ✅ Không bắt buộc
         allow_null=True,  # ✅ Cho phép giá trị null
     )
