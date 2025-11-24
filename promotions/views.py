@@ -19,7 +19,7 @@ class PromotionListCreateView(generics.ListCreateAPIView):
         now = timezone.now()
         queryset = Promotion.objects.prefetch_related(
             "flight_promotions__flight",
-            "activity_promotions__activity",
+            "activity_promotions__activity_date",
             "room_promotions__room__hotel",
             "car_promotions__car",
         ).filter(end_date__gte=now) 
@@ -34,7 +34,7 @@ class PromotionListCreateView(generics.ListCreateAPIView):
 class PromotionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Promotion.objects.prefetch_related(
             "flight_promotions__flight",
-            "activity_promotions__activity",
+            "activity_promotions__activity_date",
             "room_promotions__room__hotel",
             "car_promotions__car",
         ).all()
@@ -100,6 +100,77 @@ class PromotionDetailView(generics.RetrieveUpdateDestroyAPIView):
                 except Exception:
                     continue
             data["hotels"] = list(hotel_map.values())
+        elif promotion_type == 3:  # ACTIVITY
+            from activities.models import Activity, ActivityImage
+            instance = self.get_object()
+            
+            # Lấy tất cả ActivityPromotion của promotion này
+            activity_promotions = instance.activity_promotions.select_related(
+                'activity_date__activity_package__activity'
+            ).prefetch_related(
+                'activity_date__activity_package__activity__images'
+            ).all()
+            
+            # Tạo mảng activity_dates
+            activity_dates = []
+            activity_map = {}  # Để group theo Activity
+            
+            for ap in activity_promotions:
+                if not ap.activity_date:
+                    continue
+                
+                activity_date = ap.activity_date
+                activity_package = activity_date.activity_package
+                activity = activity_package.activity if activity_package else None
+                
+                # Tính discount từ ActivityPromotion hoặc Promotion
+                discount_percent = float(ap.discount_percent) if ap.discount_percent else (float(instance.discount_percent) if instance.discount_percent else None)
+                discount_amount = float(ap.discount_amount) if ap.discount_amount else (float(instance.discount_amount) if instance.discount_amount else None)
+                
+                # Thêm vào activity_dates
+                activity_dates.append({
+                    "id": activity_date.id,
+                    "packageId": activity_package.id if activity_package else None,
+                    "discount_percent": str(discount_percent) if discount_percent is not None else None,
+                    "discount_amount": str(discount_amount) if discount_amount is not None else None,
+                })
+                
+                # Group theo Activity để tạo mảng activitys
+                if activity:
+                    activity_id = activity.id
+                    # Tính discount lớn nhất (ưu tiên discount_percent)
+                    current_discount = discount_percent if discount_percent is not None else 0
+                    
+                    if activity_id not in activity_map:
+                        # Lấy thumbnail (chỉ 1 ảnh đầu tiên) từ ActivityImage
+                        thumbnail = None
+                        try:
+                            first_image = activity.images.first()
+                            if first_image and first_image.image:
+                                thumbnail = first_image.image
+                        except Exception:
+                            pass
+                        
+                        activity_map[activity_id] = {
+                            "id": activity.id,
+                            "review_count": activity.review_count,
+                            "avg_star": activity.avg_star,
+                            "avg_price": activity.avg_price,
+                            "thumbnails": thumbnail,
+                            "discount": current_discount,
+                        }
+                    else:
+                        # Cập nhật discount lớn nhất
+                        activity_map[activity_id]["discount"] = max(
+                            activity_map[activity_id]["discount"],
+                            current_discount
+                        )
+            
+            # Thay thế activity_promotions bằng activity_dates và thêm activitys
+            data.pop("activity_promotions", None)
+            data["activity_dates"] = activity_dates
+            data["activitys"] = list(activity_map.values())
+            
         return Response(data)
 
 # Endpoint chung để tạo promotion với cấu trúc mới
@@ -227,34 +298,41 @@ class PromotionCreateView(generics.CreateAPIView):
             }
             
         elif promotion_type == 'activity':
-            items_data = data['items']
-            
-            # Tạo ActivityPromotion cho từng activity
-            items_response = []
-            for item_data in items_data:
-                try:
-                    activity = Activity.objects.get(id=item_data['id'])
-                    activity_promotion = ActivityPromotion.objects.create(
-                        promotion=promotion,
-                        activity=activity,
-                        discount_percent=item_data.get('discount_percent'),
-                        discount_amount=item_data.get('discount_amount'),
-                    )
-                    items_response.append({
-                        'id': activity.id,
-                        'discount_percent': str(activity_promotion.discount_percent) if activity_promotion.discount_percent else None,
-                        'discount_amount': str(activity_promotion.discount_amount) if activity_promotion.discount_amount else None,
-                    })
-                except Activity.DoesNotExist:
-                    errors.append(f"Activity {item_data['id']} không tồn tại")
-                except Exception as e:
-                    errors.append(f"Lỗi khi tạo promotion cho activity {item_data['id']}: {str(e)}")
-            
-            response_data = {
-                "promotion_id": promotion_id,
-                "type": "activity",
-                "items": items_response
-            }
+            # Chỉ hỗ trợ format mới: áp dụng promotion cho ActivityDate
+            if 'actDates' not in data or not data['actDates']:
+                errors.append("actDates is required for activity promotion")
+            else:
+                from activities.models import ActivityDate
+                act_dates_data = data['actDates']
+                act_dates_response = []
+                
+                for act_date_data in act_dates_data:
+                    try:
+                        activity_date = ActivityDate.objects.get(id=act_date_data['id'])
+                        activity_promotion = ActivityPromotion.objects.create(
+                            promotion=promotion,
+                            activity_date=activity_date,
+                            discount_percent=act_date_data.get('discount_percent'),
+                            discount_amount=act_date_data.get('discount_amount'),
+                        )
+                        act_dates_response.append({
+                            'id': activity_date.id,
+                            'discount_percent': str(activity_promotion.discount_percent) if activity_promotion.discount_percent else None,
+                            'discount_amount': str(activity_promotion.discount_amount) if activity_promotion.discount_amount else None,
+                        })
+                    except ActivityDate.DoesNotExist:
+                        errors.append(f"ActivityDate {act_date_data['id']} không tồn tại")
+                    except Exception as e:
+                        errors.append(f"Lỗi khi tạo promotion cho ActivityDate {act_date_data['id']}: {str(e)}")
+                
+                if not errors:
+                    response_data = {
+                        "promotion_id": promotion_id,
+                        "type": "activity",
+                        "activity_id": data.get('activity_id'),
+                        "activity_package": data.get('activity_package'),
+                        "actDates": act_dates_response
+                    }
             
         elif promotion_type == 'car':
             cars_data = data['cars']

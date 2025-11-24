@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import Promotion, FlightPromotion, ActivityPromotion, RoomPromotion, CarPromotion
 from flights.serializers import FlightSimpleSerializer
-from activities.serializers import ActivitySimpleSerializer
 from cars.models import Car
 from datetime import datetime
 
@@ -68,7 +67,7 @@ class FlightPromotionSerializer(serializers.ModelSerializer):
         return data
 
 class ActivityPromotionSerializer(serializers.ModelSerializer):
-    activity = ActivitySimpleSerializer(read_only=True)
+    activity_date_id = serializers.IntegerField(source='activity_date.id', read_only=True, allow_null=True)
     effective_discount_percent = serializers.SerializerMethodField()
     effective_discount_amount = serializers.SerializerMethodField()
 
@@ -77,7 +76,8 @@ class ActivityPromotionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "promotion",
-            "activity",
+            "activity_date",
+            "activity_date_id",
             "discount_percent",
             "discount_amount",
             "effective_discount_percent",
@@ -227,7 +227,7 @@ class FlightPromotionItemSerializer(serializers.Serializer):
     discount_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
 
-class ActivityPromotionItemSerializer(serializers.Serializer):
+class ActivityDatePromotionItemSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     discount_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
@@ -301,8 +301,10 @@ class PromotionCreateSerializer(serializers.Serializer):
     airline_id = serializers.IntegerField(required=False)
     flights = FlightPromotionItemSerializer(many=True, required=False)
     
-    # Activity fields
-    items = ActivityPromotionItemSerializer(many=True, required=False)
+    # Activity fields (chỉ dùng cho ActivityDate)
+    activity_id = serializers.IntegerField(required=False)
+    activity_package = serializers.IntegerField(required=False)
+    actDates = ActivityDatePromotionItemSerializer(many=True, required=False)
     
     # Car fields
     cars = CarPromotionItemSerializer(many=True, required=False)
@@ -321,8 +323,9 @@ class PromotionCreateSerializer(serializers.Serializer):
             if not data.get('flights'):
                 raise serializers.ValidationError("flights is required for flight promotion")
         elif promotion_type == 'activity':
-            if not data.get('items'):
-                raise serializers.ValidationError("items is required for activity promotion")
+            # Chỉ hỗ trợ actDates (ActivityDate)
+            if not data.get('actDates'):
+                raise serializers.ValidationError("actDates is required for activity promotion")
         elif promotion_type == 'car':
             if not data.get('cars'):
                 raise serializers.ValidationError("cars is required for car promotion")

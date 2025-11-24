@@ -50,15 +50,15 @@ class ActivityPromotion(models.Model):
     promotion = models.ForeignKey(
         Promotion, on_delete=models.CASCADE, related_name="activity_promotions"
     )
-    activity = models.ForeignKey("activities.Activity", on_delete=models.CASCADE, related_name="promotions"
-    , null=True, blank=True,
+    activity_date = models.ForeignKey(
+        "activities.ActivityDate", on_delete=models.CASCADE, related_name="promotions"
     )
 
     discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.promotion.title} -> Activity: {self.activity.name}"
+        return f"{self.promotion.title} -> ActivityDate: {self.activity_date.id if self.activity_date else 'N/A'}"
 
 
 class RoomPromotion(models.Model):

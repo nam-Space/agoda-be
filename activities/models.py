@@ -80,36 +80,6 @@ class Activity(models.Model):
         except Exception:
             self.total_weighted_score = 0.0
         super().save(*args, **kwargs)
-    
-     # ✅ Hàm lấy khuyến mãi(nếu có)
-    def get_active_promotion(self):
-        now = timezone.now()
-        activity_promotions = self.promotions.select_related("promotion").all()
-
-        # Chỉ lấy những promotion đang active
-        active_promos = [
-            ap for ap in activity_promotions
-            if ap.promotion.is_active and ap.promotion.start_date <= now <= ap.promotion.end_date
-        ]
-        
-        if not active_promos:
-            return None
-
-        # Lấy promotion có discount lớn nhất
-        best_promo = max(
-            active_promos,
-            key=lambda ap: ap.discount_percent if ap.discount_percent is not None else (ap.promotion.discount_percent or 0)
-        )
-
-        promo = best_promo.promotion
-        return {
-            "id": promo.id,
-            "title": promo.title,
-            "discount_percent": best_promo.discount_percent or promo.discount_percent,
-            "discount_amount": best_promo.discount_amount or promo.discount_amount,
-            "start_date": promo.start_date,
-            "end_date": promo.end_date,
-        }
 
 
 # Model để lưu thông tin về hình ảnh hoạt động
@@ -185,6 +155,39 @@ class ActivityDate(models.Model):
 
     def __str__(self):
         return f"{self.date_launch}, {self.activity_package.name}"
+    
+    def get_active_promotion(self):
+        """Lấy promotion active cho ActivityDate này"""
+        from promotions.models import ActivityPromotion
+        now = timezone.now()
+        activity_promotions = self.promotions.select_related("promotion").all()
+
+        # Chỉ lấy những promotion đang active và liên kết với ActivityDate này
+        active_promos = [
+            ap for ap in activity_promotions
+            if ap.promotion.is_active 
+            and ap.promotion.start_date <= now <= ap.promotion.end_date
+            and ap.activity_date_id == self.id
+        ]
+        
+        if not active_promos:
+            return None
+
+        # Lấy promotion có discount lớn nhất
+        best_promo = max(
+            active_promos,
+            key=lambda ap: ap.discount_percent if ap.discount_percent is not None else (ap.promotion.discount_percent or 0)
+        )
+
+        promo = best_promo.promotion
+        return {
+            "id": promo.id,
+            "title": promo.title,
+            "discount_percent": best_promo.discount_percent or promo.discount_percent,
+            "discount_amount": best_promo.discount_amount or promo.discount_amount,
+            "start_date": promo.start_date,
+            "end_date": promo.end_date,
+        }
 
 
 class ActivityDateBookingDetail(models.Model):
@@ -237,13 +240,10 @@ class ActivityDateBookingDetail(models.Model):
             + (self.price_child or 0) * (self.child_quantity_booking or 0)
         )
 
-        # Lấy promotion từ activity nếu có
+        # Lấy promotion từ ActivityDate (chỉ áp dụng promotion cho ActivityDate)
         promo = None
-        activity = None
-        if self.activity_date and self.activity_date.activity_package and self.activity_date.activity_package.activity:
-            activity = self.activity_date.activity_package.activity
-        if activity and hasattr(activity, 'get_active_promotion'):
-            promo = activity.get_active_promotion()
+        if self.activity_date and hasattr(self.activity_date, 'get_active_promotion'):
+            promo = self.activity_date.get_active_promotion()
 
         if promo:
             percent = float(promo.get('discount_percent') or 0)
