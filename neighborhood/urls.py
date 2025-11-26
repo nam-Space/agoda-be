@@ -10,22 +10,22 @@ from .views import (
 urlpatterns = [
     path("", NeighborhoodListView.as_view(), name="neighborhood-list"),
     path(
-        "/<int:pk>/",
+        "<int:pk>/",
         NeighborhoodDetailView.as_view(),
         name="neighborhood-detail",
     ),
     path(
-        "/create/",
+        "create/",
         NeighborhoodCreateView.as_view(),
         name="neighborhood-create",
     ),
     path(
-        "/<int:pk>/update/",
+        "<int:pk>/update/",
         NeighborhoodUpdateView.as_view(),
         name="neighborhood-update",
     ),
     path(
-        "/<int:pk>/delete/",
+        "<int:pk>/delete/",
         NeighborhoodDeleteView.as_view(),
         name="neighborhood-delete",
     ),

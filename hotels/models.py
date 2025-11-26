@@ -3,6 +3,8 @@ from cities.models import City
 from django.db.models import Avg
 import math
 
+from django.utils import timezone
+
 
 class Hotel(models.Model):
     city = models.ForeignKey(
@@ -47,7 +49,7 @@ class Hotel(models.Model):
     def __str__(self):
         return self.name
 
-    # ✅ Hàm cập nhật giá trung bình
+    # ✅ Hàm tự cập nhật giá trung bình của các phòng còn available
     def update_min_price(self):
         from rooms.models import Room
 

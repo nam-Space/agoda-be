@@ -16,18 +16,26 @@ class HotelImageSerializer(serializers.ModelSerializer):
         model = HotelImage
         fields = "__all__"
 
-
 class HotelSimpleSerializer(serializers.ModelSerializer):
-    images = HotelImageSerializer(many=True, read_only=True)
-    city = CityCreateSerializer(read_only=True)
-    min_price = serializers.DecimalField(
-        max_digits=10, decimal_places=2, read_only=True
-    )
+    thumbnail = serializers.SerializerMethodField()
 
     class Meta:
         model = Hotel
-        fields = "__all__"
+        fields = [
+            "id", 
+            "name", 
+            "thumbnail", 
+            "min_price", 
+            "location",
+            "avg_star",
+            "review_count",
+            "city"
+            ]
 
+    def get_thumbnail(self, obj):
+        if obj.images.exists():
+            return obj.images.first().image
+        return None
 
 class HotelSerializer(serializers.ModelSerializer):
     images = HotelImageSerializer(many=True, read_only=True)
@@ -37,7 +45,7 @@ class HotelSerializer(serializers.ModelSerializer):
     min_price = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True
     )
-
+    
     class Meta:
         model = Hotel
         fields = "__all__"

@@ -8,6 +8,7 @@ class Airport(models.Model):
     city = models.ForeignKey(
         City, on_delete=models.CASCADE, related_name="airports", null=True
     )
+    code = models.CharField(max_length=10, unique=True, null=True, blank=True)  # Mã sân bay (VD: HAN, SGN)
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)  # Trường description mới
     location = models.TextField(blank=True, null=True)  # Trường location mới

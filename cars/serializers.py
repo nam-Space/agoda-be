@@ -36,9 +36,12 @@ class CarBookingDetailSerializer(serializers.ModelSerializer):
     car = CarSerializer()
     driver = UserSerializer(read_only=True)
 
+    total_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    discount_amount = serializers.FloatField(read_only=True)
+    final_price = serializers.FloatField(read_only=True)
+
     class Meta:
         model = CarBookingDetail
-
         fields = [
             "id",
             "car",
@@ -54,6 +57,9 @@ class CarBookingDetailSerializer(serializers.ModelSerializer):
             "total_time_estimate",
             "passenger_quantity_booking",
             "driver",
+            "total_price",
+            "discount_amount",
+            "final_price",
         ]
 
 

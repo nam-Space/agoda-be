@@ -228,7 +228,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                     <p>Xin chào <b>{booking.guest_info.full_name if booking.user else "Khách"}</b>,</p>
                                     <p>Bạn đã thanh toán thành công mã đặt phòng <b>{booking.booking_code}</b>.</p>
 
-                                    <img src={get_base64_image(image_url)} 
+                                    <img src='{baseUrl}{image_url}' 
                                         style="width:100%;height:250px;object-fit:cover;border-radius:10px" />
 
                                     <h3 style="margin-top:20px">Thông tin đặt phòng</h3>
@@ -411,7 +411,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                                 <tr>
                                                     <!-- Car image -->
                                                     <td width="120">
-                                                    <img src={get_base64_image(booking.car_detail.car.image)} 
+                                                    <img src='{baseUrl}{booking.car_detail.car.image}' 
                                                         alt="{booking.car_detail.car.name}"
                                                         style="width:120px; height:80px; object-fit:cover; border-radius:8px;">
                                                     </td>
@@ -604,7 +604,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                     <tr>
                                         <!-- Activity image -->
                                         <td width="120">
-                                        <img src={get_base64_image(booking.activity_date_detail.activity_image)} 
+                                        <img src='{baseUrl}{booking.activity_date_detail.activity_image}' 
                                             alt="{booking.activity_date_detail.activity_name}"
                                             style="width:120px; height:80px; object-fit:cover; border-radius:8px;">
                                         </td>
@@ -821,7 +821,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                     <tr>
                                         <!-- Hotel image -->
                                         <td width="120">
-                                        <img src={get_base64_image(image_url)}
+                                        <img src='{baseUrl}{image_url}'
                                             alt="{booking.hotel_detail.room.hotel.name}"
                                             style="width:120px; height:80px; object-fit:cover; border-radius:8px;">
                                         </td>
@@ -948,7 +948,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                     <tr>
                                         <!-- Car image -->
                                         <td width="120">
-                                        <img src={get_base64_image(booking.car_detail.car.image)} 
+                                        <img src='{baseUrl}{booking.car_detail.car.image}' 
                                             alt="{booking.car_detail.car.name}"
                                             style="width:120px; height:80px; object-fit:cover; border-radius:8px;">
                                         </td>
@@ -1075,7 +1075,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                     <tr>
                                         <!-- Activity image -->
                                         <td width="120">
-                                        <img src={get_base64_image(booking.activity_date_detail.activity_image)} 
+                                        <img src='{baseUrl}{booking.activity_date_detail.activity_image}' 
                                             alt="{booking.activity_date_detail.activity_name}"
                                             style="width:120px; height:80px; object-fit:cover; border-radius:8px;">
                                         </td>
@@ -1249,7 +1249,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                 <p>Xin chào <b>{booking.guest_info.full_name if booking.user else "Khách"}</b>,</p>
                                 <p>Bạn đã thanh toán thành công mã đặt phòng <b>{booking.booking_code}</b>.</p>
 
-                                <img src={get_base64_image(image_url)} 
+                                <img src='{baseUrl}{image_url}' 
                                     style="width:100%;height:250px;object-fit:cover;border-radius:10px" />
 
                                 <h3 style="margin-top:20px">Thông tin đặt phòng</h3>
@@ -1322,7 +1322,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                                 <tr>
                                                     <!-- Car image -->
                                                     <td width="120">
-                                                    <img src={get_base64_image(booking.car_detail.car.image)} 
+                                                    <img src='{baseUrl}{booking.car_detail.car.image}' 
                                                         alt="{booking.car_detail.car.name}"
                                                         style="width:120px; height:80px; object-fit:cover; border-radius:8px;">
                                                     </td>
@@ -1437,7 +1437,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                 <tr>
                                     <!-- Activity image -->
                                     <td width="120">
-                                    <img src={get_base64_image( booking.activity_date_detail.activity_image)} 
+                                    <img src='{baseUrl}{booking.activity_date_detail.activity_image}' 
                                         alt="{booking.activity_date_detail.activity_name}"
                                         style="width:120px; height:80px; object-fit:cover; border-radius:8px;">
                                     </td>

@@ -253,18 +253,21 @@ class RoomListView(generics.ListAPIView):
             today = datetime.now().date()
             queryset = queryset.filter(start_date__lte=today, end_date__gte=today)
 
-            # Filter theo ngày tìm kiếm (loại bỏ các phòng đã đặt)
+            # Filter theo ngày tìm kiếm (chỉ loại loại phòng đã đặt hết)
             if start_date and end_date:
                 sd = datetime.strptime(start_date, "%Y-%m-%d").date()
                 ed = datetime.strptime(end_date, "%Y-%m-%d").date()
                 if sd <= ed:
-                    booked_room_ids = Booking.objects.filter(
-                        # Q(service_type=1),  # giả sử service_type=1 là Room
-                        # Q(check_in_date__lt=ed) & Q(check_out_date__gt=sd)
-                        check_in_date__lt=ed,
-                        check_out_date__gt=sd,
-                    ).values_list("room_id", flat=True)
-                    queryset = queryset.exclude(id__in=booked_room_ids)
+                    from django.db.models import Count
+                    # Đếm số booking giao ngày cho từng loại phòng
+                    booking_counts = RoomBookingDetail.objects.filter(
+                        check_in__lt=ed,
+                        check_out__gt=sd,
+                    ).values("room_id").annotate(num_booked=Count("id"))
+                    booked_dict = {b["room_id"]: b["num_booked"] for b in booking_counts}
+                    # Lọc lại queryset: chỉ giữ loại phòng còn trống (giữ QuerySet)
+                    available_room_ids = [room.id for room in queryset if booked_dict.get(room.id, 0) < room.available_rooms]
+                    queryset = queryset.filter(id__in=available_room_ids)
 
         except Exception as e:
             print("get_queryset error:", e)
@@ -471,7 +474,7 @@ class RoomSearchView(generics.ListAPIView):
                 sd = datetime.strptime(start_date, "%Y-%m-%d").date()
                 ed = datetime.strptime(end_date, "%Y-%m-%d").date()
                 if sd <= ed:
-                    booked_room_ids = Booking.objects.filter(
+                    booked_room_ids = RoomBookingDetail.objects.filter(
                         check_in_date__lt=ed, check_out_date__gt=sd
                     ).values_list("room_id", flat=True)
                     queryset = queryset.exclude(id__in=booked_room_ids)

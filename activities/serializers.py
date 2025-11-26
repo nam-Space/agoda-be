@@ -13,12 +13,48 @@ from accounts.serializers import UserSerializer
 from accounts.models import CustomUser
 
 
+class ActivitySimpleSerializer(serializers.ModelSerializer):
+    thumbnail = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Activity
+        fields = [
+            "id",
+            "name",
+            "category",
+            "thumbnail",
+            "avg_price",
+            "avg_star",
+            "review_count",
+            "total_time",
+            "city",
+        ]
+
+    def get_thumbnail(self, obj):
+        first_image = obj.images.first()
+        if first_image:
+            return first_image.image  # hoặc full URL nếu cần
+        return None
+
+class ActivityPackageSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ActivityPackage
+        fields = ["id", "name", "created_at", "updated_at"]
+
 class ActivityDateSerializer(serializers.ModelSerializer):
+    activity_package = ActivityPackageSimpleSerializer(read_only=True)
+    promotion = serializers.SerializerMethodField()
+    has_promotion = serializers.SerializerMethodField()
 
     class Meta:
         model = ActivityDate
         fields = "__all__"
+    
+    def get_promotion(self, obj):
+        return obj.get_active_promotion()
 
+    def get_has_promotion(self, obj):
+        return obj.get_active_promotion() is not None
 
 class ActivityPackagesListSerializer(serializers.ModelSerializer):
     activities_dates = ActivityDateSerializer(many=True, read_only=True)
@@ -46,7 +82,6 @@ class ActivitySerializer(serializers.ModelSerializer):
         model = Activity
         fields = "__all__"
 
-
 class ActivityDetailSerializer(serializers.ModelSerializer):
     images = ActivityImageSerializer(many=True, read_only=True)
     city = CityCreateSerializer(read_only=True)
@@ -55,7 +90,6 @@ class ActivityDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Activity
         fields = "__all__"
-
 
 class ActivityCreateSerializer(serializers.ModelSerializer):
     # Sử dụng PrimaryKeyRelatedField để nhận ID của hoạt động
@@ -157,14 +191,6 @@ class ActivityPackageCreateSerializer(serializers.ModelSerializer):
         ]  # Chỉ có những trường cần thiết
 
 
-class ActivityDateSerializer(serializers.ModelSerializer):
-    activity_package = ActivityPackageSerializer()
-
-    class Meta:
-        model = ActivityDate
-        fields = "__all__"
-
-
 class ActivityDateCreateSerializer(serializers.ModelSerializer):
     # Sử dụng PrimaryKeyRelatedField để nhận ID của activity package
     activity_package = serializers.PrimaryKeyRelatedField(
@@ -191,6 +217,10 @@ class ActivityDateBookingDetailSerializer(serializers.ModelSerializer):
 
     event_organizer_activity = UserSerializer(read_only=True)
 
+    total_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    discount_amount = serializers.FloatField(read_only=True)
+    final_price = serializers.FloatField(read_only=True)
+
     class Meta:
         model = ActivityDateBookingDetail
         fields = [
@@ -210,7 +240,10 @@ class ActivityDateBookingDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "event_organizer_activity",
-        ]  # Chỉ có những trường cần thiết
+            "total_price",
+            "discount_amount",
+            "final_price",
+        ]
 
 
 class ActivityDateBookingCreateSerializer(serializers.ModelSerializer):

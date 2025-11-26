@@ -592,11 +592,7 @@ class ActivityPackagePagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
 
         for field, value in request.query_params.items():
-            if field not in [
-                "current",
-                "pageSize",
-                "event_organizer_id",
-            ]:
+            if field not in ["current", "pageSize", "event_organizer_id", "sort"]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
 
@@ -660,6 +656,7 @@ class ActivityPackageListView(generics.ListAPIView):
             if field not in [
                 "pageSize",
                 "current",
+                "sort",
                 "event_organizer_id",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
@@ -670,6 +667,24 @@ class ActivityPackageListView(generics.ListAPIView):
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
+
+        sort_params = filter_params.get("sort")
+        order_fields = []
+
+        if sort_params:
+            # Ví dụ: sort=avg_price-desc,avg_star-asc
+            sort_list = sort_params.split(",")
+            for sort_item in sort_list:
+                try:
+                    field, direction = sort_item.split("-")
+                    if direction == "desc":
+                        order_fields.append(f"-{field}")
+                    else:
+                        order_fields.append(field)
+                except ValueError:
+                    continue  # bỏ qua format không hợp lệ
+
+        queryset = queryset.order_by(*order_fields)
 
         # Lấy tham số 'current' từ query string để tính toán trang
         current = self.request.query_params.get(
@@ -859,11 +874,7 @@ class ActivityDatePagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
 
         for field, value in request.query_params.items():
-            if field not in [
-                "current",
-                "pageSize",
-                "event_organizer_id",
-            ]:
+            if field not in ["current", "pageSize", "event_organizer_id", "sort"]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
 
@@ -930,6 +941,7 @@ class ActivityDateListView(generics.ListAPIView):
                 "pageSize",
                 "current",
                 "event_organizer_id",
+                "sort",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
@@ -940,6 +952,24 @@ class ActivityDateListView(generics.ListAPIView):
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
+
+        sort_params = filter_params.get("sort")
+        order_fields = []
+
+        if sort_params:
+            # Ví dụ: sort=avg_price-desc,avg_star-asc
+            sort_list = sort_params.split(",")
+            for sort_item in sort_list:
+                try:
+                    field, direction = sort_item.split("-")
+                    if direction == "desc":
+                        order_fields.append(f"-{field}")
+                    else:
+                        order_fields.append(field)
+                except ValueError:
+                    continue  # bỏ qua format không hợp lệ
+
+        queryset = queryset.order_by(*order_fields)
 
         # Lấy tham số 'current' từ query string để tính toán trang
         current = self.request.query_params.get(
