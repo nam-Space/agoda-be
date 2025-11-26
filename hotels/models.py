@@ -5,6 +5,7 @@ import math
 
 from django.utils import timezone
 
+
 class Hotel(models.Model):
     city = models.ForeignKey(
         City, on_delete=models.CASCADE, related_name="hotels", null=True
@@ -47,7 +48,7 @@ class Hotel(models.Model):
 
     def __str__(self):
         return self.name
-        
+
     # ✅ Hàm tự cập nhật giá trung bình của các phòng còn available
     def update_min_price(self):
         from rooms.models import Room

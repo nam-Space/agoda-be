@@ -4,26 +4,31 @@ from .models import Airline, Aircraft
 from .serializers import AirlineSerializer, AircraftSerializer
 from rest_framework.response import Response
 from rest_framework import status
+from django.db.models import Q
+
 
 # Phân trang chung cho Airline và Aircraft
 class CommonPagination(PageNumberPagination):
     page_size = 10
-    page_query_param = 'current'         
-    page_size_query_param = 'pageSize'   
+    page_query_param = "current"
+    page_size_query_param = "pageSize"
     max_page_size = 100
 
     def get_paginated_response(self, data):
-        return Response({
-            "isSuccess": True,
-            "message": self.context.get('message', "Fetched data successfully!"),
-            "meta": {
-                "totalItems": self.page.paginator.count,
-                "currentPage": self.page.number,
-                "itemsPerPage": self.get_page_size(self.request),
-                "totalPages": self.page.paginator.num_pages,
-            },
-            "data": data,
-        })
+        return Response(
+            {
+                "isSuccess": True,
+                "message": self.context.get("message", "Fetched data successfully!"),
+                "meta": {
+                    "totalItems": self.page.paginator.count,
+                    "currentPage": self.page.number,
+                    "itemsPerPage": self.get_page_size(self.request),
+                    "totalPages": self.page.paginator.num_pages,
+                },
+                "data": data,
+            }
+        )
+
 
 class AirlineListView(generics.ListCreateAPIView):
     serializer_class = AirlineSerializer
@@ -32,7 +37,44 @@ class AirlineListView(generics.ListCreateAPIView):
     pagination_class = CommonPagination
 
     def get_queryset(self):
-        return Airline.objects.all().order_by('-id')
+        queryset = Airline.objects.all().order_by("-id")
+        filter_params = self.request.query_params
+        query_filter = Q()
+
+        # Duyệt qua các tham số query để tạo bộ lọc cho mỗi trường
+        for field, value in filter_params.items():
+            if (
+                field != "current"
+                and field != "pageSize"
+                and field != "page"
+                and field != "page_size"
+                and field != "sort"
+            ):
+                query_filter &= Q(
+                    **{f"{field}__icontains": value}
+                )  # Thêm điều kiện lọc cho mỗi trường
+
+        queryset = queryset.filter(query_filter)
+
+        sort_params = filter_params.get("sort")
+        order_fields = []
+
+        if sort_params:
+            # Ví dụ: sort=avg_price-desc,avg_star-asc
+            sort_list = sort_params.split(",")
+            for sort_item in sort_list:
+                try:
+                    field, direction = sort_item.split("-")
+                    if direction == "desc":
+                        order_fields.append(f"-{field}")
+                    else:
+                        order_fields.append(field)
+                except ValueError:
+                    continue  # bỏ qua format không hợp lệ
+
+        queryset = queryset.order_by(*order_fields)
+
+        return queryset
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -40,18 +82,17 @@ class AirlineListView(generics.ListCreateAPIView):
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             # Truyền message vào context để phân trang trả về đúng message
-            self.paginator.context = {'message': "Fetched all airlines successfully!"}
+            self.paginator.context = {"message": "Fetched all airlines successfully!"}
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            "isSuccess": True,
-            "message": "Fetched all airlines successfully!",
-            "meta": {
-                "totalItems": queryset.count(),
-                "pagination": None
-            },
-            "data": serializer.data,
-        })
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched all airlines successfully!",
+                "meta": {"totalItems": queryset.count(), "pagination": None},
+                "data": serializer.data,
+            }
+        )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -75,7 +116,7 @@ class AirlineListView(generics.ListCreateAPIView):
         )
 
 
-class AirlineDetailView(generics.RetrieveAPIView):
+class AirlineDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Airline.objects.all()
     serializer_class = AirlineSerializer
     authentication_classes = []
@@ -92,6 +133,37 @@ class AirlineDetailView(generics.RetrieveAPIView):
             }
         )
 
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "Airline updated successfully",
+                    "data": serializer.data,
+                }
+            )
+        return Response(
+            {
+                "isSuccess": False,
+                "message": "Failed to update airline",
+                "data": serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Airline deleted successfully",
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class AircraftListView(generics.ListCreateAPIView):
@@ -101,10 +173,32 @@ class AircraftListView(generics.ListCreateAPIView):
     pagination_class = CommonPagination
 
     def get_queryset(self):
-        queryset = Aircraft.objects.select_related('airline').all().order_by('-created_at')
-        airline_id = self.request.query_params.get('airline_id')
+        queryset = (
+            Aircraft.objects.select_related("airline").all().order_by("-created_at")
+        )
+        filter_params = self.request.query_params
+        airline_id = filter_params.get("airline_id")
         if airline_id:
             queryset = queryset.filter(airline_id=airline_id)
+
+        sort_params = filter_params.get("sort")
+        order_fields = []
+
+        if sort_params:
+            # Ví dụ: sort=avg_price-desc,avg_star-asc
+            sort_list = sort_params.split(",")
+            for sort_item in sort_list:
+                try:
+                    field, direction = sort_item.split("-")
+                    if direction == "desc":
+                        order_fields.append(f"-{field}")
+                    else:
+                        order_fields.append(field)
+                except ValueError:
+                    continue  # bỏ qua format không hợp lệ
+
+        queryset = queryset.order_by(*order_fields)
+
         return queryset
 
     def list(self, request, *args, **kwargs):
@@ -112,18 +206,17 @@ class AircraftListView(generics.ListCreateAPIView):
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            self.paginator.context = {'message': "Fetched all aircrafts successfully!"}
+            self.paginator.context = {"message": "Fetched all aircrafts successfully!"}
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            "isSuccess": True,
-            "message": "Fetched all aircrafts successfully!",
-            "meta": {
-                "totalItems": queryset.count(),
-                "pagination": None
-            },
-            "data": serializer.data,
-        })
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched all aircrafts successfully!",
+                "meta": {"totalItems": queryset.count(), "pagination": None},
+                "data": serializer.data,
+            }
+        )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -148,7 +241,7 @@ class AircraftListView(generics.ListCreateAPIView):
 
 
 class AircraftDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Aircraft.objects.select_related('airline').all()
+    queryset = Aircraft.objects.select_related("airline").all()
     serializer_class = AircraftSerializer
     authentication_classes = []
     permission_classes = []
@@ -193,5 +286,5 @@ class AircraftDetailView(generics.RetrieveUpdateDestroyAPIView):
                 "isSuccess": True,
                 "message": "Aircraft deleted successfully",
             },
-            status=status.HTTP_204_NO_CONTENT,
+            status=status.HTTP_200_OK,
         )

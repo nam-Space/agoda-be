@@ -31,11 +31,7 @@ class CityPagination(PageNumberPagination):
             self.filters["country_id"] = country_id
 
         for field, value in request.query_params.items():
-            if field not in [
-                "current",
-                "pageSize",
-                "country_id",
-            ]:
+            if field not in ["current", "pageSize", "country_id", "sort"]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
 
@@ -103,12 +99,30 @@ class CityListView(generics.ListAPIView):
             except ValueError:
                 return City.objects.none()
 
-
         query_filter = Q()
         for field, value in params.items():
-            if field not in ["pageSize", "current", "country_id"]:
+            if field not in ["pageSize", "current", "country_id", "sort"]:
                 query_filter &= Q(**{f"{field}__icontains": value})
+
         queryset = queryset.filter(query_filter)
+
+        sort_params = params.get("sort")
+        order_fields = []
+
+        if sort_params:
+            # Ví dụ: sort=avg_price-desc,avg_star-asc
+            sort_list = sort_params.split(",")
+            for sort_item in sort_list:
+                try:
+                    field, direction = sort_item.split("-")
+                    if direction == "desc":
+                        order_fields.append(f"-{field}")
+                    else:
+                        order_fields.append(field)
+                except ValueError:
+                    continue  # bỏ qua format không hợp lệ
+
+        queryset = queryset.order_by(*order_fields)
 
         # Lấy tham số 'current' từ query string để tính toán trang
         current = self.request.query_params.get(

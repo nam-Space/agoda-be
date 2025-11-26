@@ -4,7 +4,7 @@ from airports.models import Airport
 from airports.serializers import AirportSerializer
 from airlines.models import Airline, Aircraft
 from airlines.serializers import AirlineSerializer, AircraftSerializer
-from datetime import timedelta
+
 
 class FlightLegSerializer(serializers.ModelSerializer):
     # READ
@@ -13,15 +13,15 @@ class FlightLegSerializer(serializers.ModelSerializer):
 
     # WRITE
     departure_airport_id = serializers.PrimaryKeyRelatedField(
-        queryset=Airport.objects.all(), source='departure_airport', write_only=True
+        queryset=Airport.objects.all(), source="departure_airport", write_only=True
     )
     arrival_airport_id = serializers.PrimaryKeyRelatedField(
-        queryset=Airport.objects.all(), source='arrival_airport', write_only=True
+        queryset=Airport.objects.all(), source="arrival_airport", write_only=True
     )
 
     # flight_id dùng khi tạo riêng leg (không cần khi nested create)
     flight_id = serializers.PrimaryKeyRelatedField(
-        queryset=Flight.objects.all(), source='flight', write_only=True, required=False
+        queryset=Flight.objects.all(), source="flight", write_only=True, required=False
     )
 
     duration_minutes = serializers.IntegerField(required=False)
@@ -30,36 +30,29 @@ class FlightLegSerializer(serializers.ModelSerializer):
         model = FlightLeg
         fields = [
             "id",
-
             # link flight
             "flight_id",
-
             # thời gian
             "departure_time",
             "arrival_time",
-
             # sân bay
             "departure_airport",
             "departure_airport_id",
             "arrival_airport",
             "arrival_airport_id",
-
             # thông tin chuyến bay
             "flight_code",
-
             # auto-calculated
             "duration_minutes",
         ]
 
+
 class SeatClassPricingSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField(read_only=True)
     flight_id = serializers.PrimaryKeyRelatedField(
-        queryset=Flight.objects.all(),
-        source='flight',
-        write_only=True,
-        required=False
+        queryset=Flight.objects.all(), source="flight", write_only=True, required=False
     )
-    
+
     class Meta:
         model = SeatClassPricing
         fields = [
@@ -76,19 +69,20 @@ class SeatClassPricingSerializer(serializers.ModelSerializer):
             "has_priority_boarding",
             "price",
         ]
-    
+
     def get_price(self, obj):
         return obj.price()
 
+
 class FlightSimpleSerializer(serializers.ModelSerializer):
     airline = AirlineSerializer(read_only=True)
-    
+
     # Computed fields
     departure_time = serializers.SerializerMethodField()
     arrival_time = serializers.SerializerMethodField()
     departure_airport = serializers.SerializerMethodField()
     arrival_airport = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Flight
         fields = [
@@ -103,7 +97,7 @@ class FlightSimpleSerializer(serializers.ModelSerializer):
             "departure_airport",
             "arrival_airport",
         ]
-    
+
     def get_departure_time(self, obj):
         first_leg = obj.legs.order_by("departure_time").first()
         return first_leg.departure_time if first_leg else None
@@ -120,30 +114,61 @@ class FlightSimpleSerializer(serializers.ModelSerializer):
         leg = obj.legs.order_by("arrival_time").last()
         return AirportSerializer(leg.arrival_airport).data if leg else None
 
+
+class FlightGetListSerializer(serializers.ModelSerializer):
+    airline = AirlineSerializer(read_only=True)
+    aircraft = AircraftSerializer(read_only=True)
+
+    seat_classes = SeatClassPricingSerializer(many=True, read_only=True)
+    legs = FlightLegSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Flight
+        fields = "__all__"
+
+
+class FlightLegGetListSerializer(serializers.ModelSerializer):
+    flight = FlightGetListSerializer(read_only=True)
+    departure_airport = AirportSerializer(read_only=True)
+    arrival_airport = AirportSerializer(read_only=True)
+
+    class Meta:
+        model = FlightLeg
+        fields = "__all__"
+
+
+class SeatClassPricingGetListSerializer(serializers.ModelSerializer):
+    flight = FlightGetListSerializer(read_only=True)
+
+    class Meta:
+        model = SeatClassPricing
+        fields = "__all__"
+
+
 class FlightSerializer(serializers.ModelSerializer):
     airline = AirlineSerializer(read_only=True)
     airline_id = serializers.PrimaryKeyRelatedField(
-        queryset=Airline.objects.all(),
-        source='airline',
-        write_only=True
+        queryset=Airline.objects.all(), source="airline", write_only=True
     )
-    
+
     aircraft = AircraftSerializer(read_only=True)
     aircraft_id = serializers.PrimaryKeyRelatedField(
         queryset=Aircraft.objects.all(),
-        source='aircraft',
+        source="aircraft",
         write_only=True,
         required=False,
-        allow_null=True
+        allow_null=True,
     )
-    
+
     # READ
     seat_classes = SeatClassPricingSerializer(many=True, read_only=True)
     legs = FlightLegSerializer(many=True, read_only=True)
 
     # WRITE: tạo legs và seat_classes lúc tạo flight
     legs_data = FlightLegSerializer(many=True, write_only=True, required=False)
-    seat_classes_data = SeatClassPricingSerializer(many=True, write_only=True, required=False)
+    seat_classes_data = SeatClassPricingSerializer(
+        many=True, write_only=True, required=False
+    )
 
     # Promotion
     promotion = serializers.SerializerMethodField()
@@ -167,19 +192,15 @@ class FlightSerializer(serializers.ModelSerializer):
             "baggage_included",
             "stops",
             "base_price",
-
             # legs
             "legs",
             "legs_data",
-            
             # seat classes
             "seat_classes",
             "seat_classes_data",
-
             # promotion
             "promotion",
             "has_promotion",
-
             # computed
             "departure_time",
             "arrival_time",
@@ -235,6 +256,7 @@ class FlightSerializer(serializers.ModelSerializer):
     def get_has_promotion(self, obj):
         return obj.get_active_promotion() is not None
 
+
 # Serializer dùng cho tạo mới (write) FlightBookingDetail
 class FlightBookingDetailCreateSerializer(serializers.ModelSerializer):
     flight = serializers.PrimaryKeyRelatedField(queryset=Flight.objects.all())
@@ -248,10 +270,11 @@ class FlightBookingDetailCreateSerializer(serializers.ModelSerializer):
             "total_price",
         ]
 
+
 # 👇 Dùng khi hiển thị trong Booking detail
 class FlightBookingDetailSerializer(serializers.ModelSerializer):
     flight = FlightSerializer(read_only=True)
-    
+
     class Meta:
         model = FlightBookingDetail
         fields = [
@@ -263,4 +286,3 @@ class FlightBookingDetailSerializer(serializers.ModelSerializer):
             "discount_amount",
             "final_price",
         ]
-

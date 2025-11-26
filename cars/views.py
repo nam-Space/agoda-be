@@ -40,7 +40,7 @@ class CarPagination(PageNumberPagination):
             self.filters["user_id"] = user_id
 
         for field, value in request.query_params.items():
-            if field not in ["current", "pageSize", "user_id", "recommended"]:
+            if field not in ["current", "pageSize", "user_id", "recommended", "sort"]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
 
@@ -112,6 +112,7 @@ class CarListView(generics.ListAPIView):
                 "current",
                 "user_id",
                 "recommended",
+                "sort",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
