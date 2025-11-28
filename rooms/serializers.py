@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import Room, RoomImage, RoomBookingDetail, RoomAmenity
-from hotels.serializers import HotelCreateSerializer
+from hotels.serializers import HotelCreateSerializer, HotelSimpleSerializer
 from accounts.serializers import UserSerializer
+from hotels.models import Hotel
 
 
 class RoomImageSerializer(serializers.ModelSerializer):
@@ -11,7 +12,7 @@ class RoomImageSerializer(serializers.ModelSerializer):
 
 
 class RoomSerializer(serializers.ModelSerializer):
-    hotel = HotelCreateSerializer(read_only=True)
+    hotel = HotelSimpleSerializer(read_only=True)
     images = RoomImageSerializer(many=True, read_only=True)
     promotion = serializers.SerializerMethodField()
     has_promotion = serializers.SerializerMethodField()
@@ -26,11 +27,52 @@ class RoomSerializer(serializers.ModelSerializer):
     def get_has_promotion(self, obj):
         return obj.get_active_promotion() is not None
 
+
+class RoomCreateSerializer(serializers.ModelSerializer):
+    hotel = serializers.PrimaryKeyRelatedField(queryset=Hotel.objects.all())
+    # images = RoomImageSerializer(many=True, read_only=True)
+    promotion = serializers.SerializerMethodField()
+    has_promotion = serializers.SerializerMethodField()
+
+    amenities_data = serializers.ListField(
+        child=serializers.DictField(), write_only=True, required=False
+    )
+
+    class Meta:
+        model = Room
+        fields = "__all__"
+
+    def get_promotion(self, obj):
+        return obj.get_active_promotion()
+
+    def get_has_promotion(self, obj):
+        return obj.get_active_promotion() is not None
+
+    def create(self, validated_data):
+        amenities_data = validated_data.pop("amenities_data", [])
+        room = Room.objects.create(**validated_data)
+
+        # Tạo RoomAmenity
+        for amenity in amenities_data:
+            RoomAmenity.objects.create(room=room, name=amenity.get("name"))
+
+        return room
+
+
 class RoomAmenitySerializer(serializers.ModelSerializer):
+    room = RoomSerializer(read_only=True)
+
     class Meta:
         model = RoomAmenity
-        fields = ["id", "name"]
+        fields = ["id", "name", "room"]
 
+
+class RoomAmenityCreateSerializer(serializers.ModelSerializer):
+    room = serializers.PrimaryKeyRelatedField(queryset=Room.objects.all())
+
+    class Meta:
+        model = RoomAmenity
+        fields = ["id", "name", "room"]
 
 
 class RoomBookingDetailSerializer(serializers.ModelSerializer):
@@ -54,10 +96,17 @@ class RoomBookingDetailSerializer(serializers.ModelSerializer):
         ]
 
 
-
 class RoomBookingDetailCreateSerializer(serializers.ModelSerializer):
     room = serializers.PrimaryKeyRelatedField(queryset=Room.objects.all())
 
     class Meta:
         model = RoomBookingDetail
-        fields = ["id", "room", "check_in", "check_out", "num_guests", "room_type", "room_count"]
+        fields = [
+            "id",
+            "room",
+            "check_in",
+            "check_out",
+            "num_guests",
+            "room_type",
+            "room_count",
+        ]
