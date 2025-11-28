@@ -1,43 +1,3 @@
-# from django.db import models
-# from hotels.models import Hotel
-# from bookings.models import Booking
-
-# # Create your models here.
-# class Room(models.Model):
-#     hotel = models.ForeignKey(
-#         Hotel, on_delete=models.CASCADE, related_name="rooms", null=True
-#     )
-#     room_type = models.CharField(max_length=100)
-#     price_per_night = models.DecimalField(max_digits=10, decimal_places=2)
-#     capacity = models.IntegerField()
-#     beds = models.IntegerField(default=1)
-#     area_m2 = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-#     available = models.BooleanField(default=True)
-#     description = models.TextField(blank=True)
-
-#     def __str__(self):
-#         return f"{self.hotel.name} - {self.room_type}"
-
-
-# # Model để lưu thông tin về hình ảnh phòng
-# class RoomImage(models.Model):
-#     room = models.ForeignKey("Room", related_name="images", on_delete=models.CASCADE)
-#     image = models.ImageField(upload_to="rooms/", null=True, blank=True)
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     def __str__(self):
-#         return f"Image for {self.room.room_type} in {self.room.hotel.name}"
-
-# class RoomBookingDetail(models.Model):
-#     booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='hotel_detail')
-#     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='room_bookings')
-#     check_in = models.DateField()
-#     check_out = models.DateField()
-#     num_guests = models.IntegerField()
-
-#     def __str__(self):
-#         return f"HotelBooking for {self.booking.booking_code}"
-
 from django.db import models
 from hotels.models import Hotel
 from django.utils import timezone
@@ -51,7 +11,7 @@ class Room(models.Model):
         Hotel, on_delete=models.CASCADE, related_name="rooms", null=True
     )
     room_type = models.CharField(max_length=100)
-    price_per_night = models.DecimalField(max_digits=10, decimal_places=2)
+    price_per_night = models.FloatField(default=0.0)
     # capacity = models.IntegerField()
 
     # Capacity chia thành adults và children
@@ -70,6 +30,8 @@ class Room(models.Model):
     area_m2 = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     available = models.BooleanField(default=True)
     description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     @property
     def capacity(self):
@@ -101,22 +63,29 @@ class Room(models.Model):
 
     def get_active_promotion(self):
         from django.utils import timezone
+
         now = timezone.now()
         room_promotions = self.promotions.select_related("promotion").all()
 
         # Chỉ lấy những promotion đang active
         active_promos = [
-            rp for rp in room_promotions
-            if rp.promotion.is_active and rp.promotion.start_date <= now <= rp.promotion.end_date
+            rp
+            for rp in room_promotions
+            if rp.promotion.is_active
+            and rp.promotion.start_date <= now <= rp.promotion.end_date
         ]
-        
+
         if not active_promos:
             return None
 
         # Lấy promotion có discount lớn nhất
         best_promo = max(
             active_promos,
-            key=lambda rp: rp.discount_percent if rp.discount_percent is not None else (rp.promotion.discount_percent or 0)
+            key=lambda rp: (
+                rp.discount_percent
+                if rp.discount_percent is not None
+                else (rp.promotion.discount_percent or 0)
+            ),
         )
 
         promo = best_promo.promotion
@@ -143,11 +112,12 @@ class RoomImage(models.Model):
 # ✅ Bảng phụ lưu tiện ích phòng
 class RoomAmenity(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="amenities")
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.name} ({self.room.room_type})"
-
 
 
 # Thông tin chi tiết đặt phòng khách sạn
@@ -162,7 +132,9 @@ class RoomBookingDetail(models.Model):
     check_out = models.DateTimeField()
     num_guests = models.IntegerField()
     # Thêm loại phòng và số lượng phòng
-    room_type = models.CharField(max_length=100, blank=True, null=True, help_text="Loại phòng (copy từ Room)")
+    room_type = models.CharField(
+        max_length=100, blank=True, null=True, help_text="Loại phòng (copy từ Room)"
+    )
     room_count = models.PositiveIntegerField(default=1, help_text="Số lượng phòng đặt")
     owner_hotel = models.ForeignKey(
         CustomUser,
@@ -174,7 +146,6 @@ class RoomBookingDetail(models.Model):
     total_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     discount_amount = models.FloatField(default=0.0)
     final_price = models.FloatField(default=0.0)
-
 
     def save(self, *args, **kwargs):
         # Tự động gán loại phòng nếu chưa có
@@ -189,24 +160,26 @@ class RoomBookingDetail(models.Model):
             # Luôn convert về date để tính số đêm
             check_in = self.check_in
             check_out = self.check_out
-            if hasattr(check_in, 'date'):
+            if hasattr(check_in, "date"):
                 check_in = check_in.date()
-            if hasattr(check_out, 'date'):
+            if hasattr(check_out, "date"):
                 check_out = check_out.date()
             num_nights = (check_out - check_in).days
             if num_nights < 1:
                 num_nights = 1
-            self.total_price = float(self.room.price_per_night) * num_nights * self.room_count
+            self.total_price = (
+                float(self.room.price_per_night) * num_nights * self.room_count
+            )
         else:
             self.total_price = 0
 
         # Tính giảm giá nếu có promotion (ưu tiên lấy promotion từ room)
         promo = None
-        if self.room and hasattr(self.room, 'get_active_promotion'):
+        if self.room and hasattr(self.room, "get_active_promotion"):
             promo = self.room.get_active_promotion()
         if promo:
-            percent = float(promo.get('discount_percent') or 0)
-            amount = float(promo.get('discount_amount') or 0)
+            percent = float(promo.get("discount_percent") or 0)
+            amount = float(promo.get("discount_amount") or 0)
             if amount > 0:
                 self.discount_amount = min(amount, float(self.total_price))
             elif percent > 0:
@@ -230,7 +203,9 @@ class RoomBookingDetail(models.Model):
             self.booking.discount_amount = self.discount_amount
             self.booking.final_price = self.final_price
             self.booking.total_price = self.total_price
-            self.booking.save(update_fields=["discount_amount", "final_price", "total_price"])
+            self.booking.save(
+                update_fields=["discount_amount", "final_price", "total_price"]
+            )
 
     def __str__(self):
         return f"HotelBooking for {self.booking.booking_code} | {self.room_type} x {self.room_count}"

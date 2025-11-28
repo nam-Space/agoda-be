@@ -44,22 +44,29 @@ class Car(models.Model):
 
     def get_active_promotion(self):
         from django.utils import timezone
+
         now = timezone.now()
         car_promotions = self.promotions.select_related("promotion").all()
 
         # Chỉ lấy những promotion đang active
         active_promos = [
-            cp for cp in car_promotions
-            if cp.promotion.is_active and cp.promotion.start_date <= now <= cp.promotion.end_date
+            cp
+            for cp in car_promotions
+            if cp.promotion.is_active
+            and cp.promotion.start_date <= now <= cp.promotion.end_date
         ]
-        
+
         if not active_promos:
             return None
 
         # Lấy promotion có discount lớn nhất
         best_promo = max(
             active_promos,
-            key=lambda cp: cp.discount_percent if cp.discount_percent is not None else (cp.promotion.discount_percent or 0)
+            key=lambda cp: (
+                cp.discount_percent
+                if cp.discount_percent is not None
+                else (cp.promotion.discount_percent or 0)
+            ),
         )
 
         promo = best_promo.promotion
@@ -134,11 +141,11 @@ class CarBookingDetail(models.Model):
             self.driver = self.car.user
 
         # Tính toán giảm giá nếu có promotion (giả sử có hàm get_active_promotion ở car)
-        if self.car and hasattr(self.car, 'get_active_promotion'):
+        if self.car and hasattr(self.car, "get_active_promotion"):
             promo = self.car.get_active_promotion()
             if promo:
-                percent = float(promo.get('discount_percent') or 0)
-                amount = float(promo.get('discount_amount') or 0)
+                percent = float(promo.get("discount_percent") or 0)
+                amount = float(promo.get("discount_amount") or 0)
                 if amount > 0:
                     self.discount_amount = min(amount, float(self.total_price))
                 elif percent > 0:
@@ -156,11 +163,21 @@ class CarBookingDetail(models.Model):
         # Tổng hợp discount/final_price lên booking nếu có nhiều car detail (giả sử dùng service_ref_ids)
         if self.booking:
             details = [self]
-            if hasattr(self.booking, 'service_ref_ids') and self.booking.service_ref_ids:
+            if (
+                hasattr(self.booking, "service_ref_ids")
+                and self.booking.service_ref_ids
+            ):
                 from .models import CarBookingDetail
-                details = CarBookingDetail.objects.filter(id__in=self.booking.service_ref_ids)
-            self.booking.discount_amount = sum(getattr(d, 'discount_amount', 0) for d in details)
-            self.booking.final_price = sum(getattr(d, 'final_price', 0) for d in details)
+
+                details = CarBookingDetail.objects.filter(
+                    id__in=self.booking.service_ref_ids
+                )
+            self.booking.discount_amount = sum(
+                getattr(d, "discount_amount", 0) for d in details
+            )
+            self.booking.final_price = sum(
+                getattr(d, "final_price", 0) for d in details
+            )
             self.booking.save(update_fields=["discount_amount", "final_price"])
 
     def __str__(self):

@@ -27,34 +27,6 @@ import os
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
-def get_base64_image(image_path):
-    """
-    image_path: có thể là đường dẫn tương đối kiểu '/media/activity_images/xxx.jpg'
-    """
-    # Bỏ '/media/' ở đầu nếu có, vì MEDIA_ROOT là thư mục media
-    if image_path.startswith("/media/"):
-        relative_path = image_path[
-            len("/media/") :
-        ]  # 'activity_images/img1_H19Tg4Q.jpg'
-    else:
-        relative_path = image_path.lstrip("/")  # đảm bảo không có dấu /
-
-    local_path = os.path.join(settings.MEDIA_ROOT, relative_path)
-
-    try:
-        with open(local_path, "rb") as img_file:
-            import base64
-
-            encoded_string = base64.b64encode(img_file.read()).decode("utf-8")
-            ext = local_path.split(".")[-1].lower()
-            if ext == "jpg":
-                ext = "jpeg"
-            return f"data:image/{ext};base64,{encoded_string}"
-    except Exception as e:
-        print("Lỗi khi đọc file ảnh:", e)
-        return ""
-
-
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
@@ -256,7 +228,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
                             if booking.hotel_detail.owner_hotel
                             else None
                         ),  # user có thể null
-                        email=booking.hotel_detail.owner_hotel.email,
+                        email=(
+                            booking.hotel_detail.owner_hotel.email
+                            if booking.hotel_detail.owner_hotel
+                            else None
+                        ),
                         title="Thanh toán thành công",
                         message=f"""
                         <div class='border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]'>
@@ -482,7 +458,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
                             if booking.car_detail.driver
                             else None
                         ),  # user có thể null
-                        email=booking.car_detail.driver.email,
+                        email=(
+                            booking.car_detail.driver.email
+                            if booking.car_detail.driver
+                            else None
+                        ),
                         title="Thanh toán thành công",
                         message=f"""
                         <div class='border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]'>
@@ -509,7 +489,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                             </div>
                         </div>""",
                         message_email="",
-                        link=f"",
+                        link=f"/car-payment",
                         send_mail_flag=False,
                     )
 
@@ -547,7 +527,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                 </div>
                             </div>""",
                             message_email="",
-                            link=f"/room-payment",  # hoặc link phù hợp cho admin
+                            link=f"/car-payment",  # hoặc link phù hợp cho admin
                             send_mail_flag=False,
                         )
 
@@ -675,7 +655,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
                             if booking.activity_date_detail.event_organizer_activity
                             else None
                         ),  # user có thể null
-                        email=booking.activity_date_detail.event_organizer_activity.email,
+                        email=(
+                            booking.activity_date_detail.event_organizer_activity.email
+                            if booking.activity_date_detail.event_organizer_activity
+                            else None
+                        ),
                         title="Thanh toán thành công",
                         message=f"""
                         <div class='border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]'>

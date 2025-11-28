@@ -10,6 +10,10 @@ from .views import (
     RoomAmenityListView,
     RoomSearchView,
     RoomBookingDetailView,
+    RoomAmenityCreateView,
+    RoomAmenityDetailView,
+    RoomAmenityUpdateView,
+    RoomAmenityDeleteView,
 )
 
 urlpatterns = [
@@ -23,15 +27,26 @@ urlpatterns = [
         RoomImageDeleteView.as_view(),
         name="room-image-delete",
     ),
-    path(
-        "rooms/<int:room_id>/amenities/",
-        RoomAmenityListView.as_view(),
-        name="room-amenities",
-    ),
     path("rooms/search/", RoomSearchView.as_view(), name="room-search"),
     path(
         "rooms-booking/<int:pk>/",
         RoomBookingDetailView.as_view(),
         name="room-booking-detail",
+    ),
+    # amenities
+    path("amenities/", RoomAmenityListView.as_view(), name="amenities-list"),
+    path("amenities/create/", RoomAmenityCreateView.as_view(), name="amenities-create"),
+    path(
+        "amenities/<int:pk>/", RoomAmenityDetailView.as_view(), name="amenities-detail"
+    ),
+    path(
+        "amenities/<int:pk>/update/",
+        RoomAmenityUpdateView.as_view(),
+        name="amenities-update",
+    ),
+    path(
+        "amenities/<int:pk>/delete/",
+        RoomAmenityDeleteView.as_view(),
+        name="amenities-delete",
     ),
 ]
