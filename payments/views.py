@@ -263,11 +263,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
                     )
 
                     # gửi thông báo cho nhân viên của khách sạn đó (không gửi email)
-                    staffs = booking.hotel_detail.owner_hotel.staffs.all()
-                    for staff in staffs:
+                    hotel_staffs = booking.hotel_detail.owner_hotel.hotel_staffs.all()
+                    for hotel_staff in hotel_staffs:
                         Notification.objects.create(
-                            user=staff,
-                            email=staff.email,
+                            user=hotel_staff,
+                            email=hotel_staff.email,
                             title="Thanh toán thành công",
                             message=f"""
                             <div class='border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]'>
@@ -1525,13 +1525,18 @@ class PaymentPagination(PageNumberPagination):
         )
         driver_id = request.query_params.get("driver_id")
         status = request.query_params.get("status")
-        activity_id = request.query_params.get("activity_id")
+        activity_date_id = request.query_params.get("activity_date_id")
         min_time_checkin_room = request.query_params.get("min_time_checkin_room")
         max_time_checkin_room = request.query_params.get("max_time_checkin_room")
         min_time_checkout_room = request.query_params.get("min_time_checkout_room")
         max_time_checkout_room = request.query_params.get("max_time_checkout_room")
         min_date_launch_activity = request.query_params.get("min_date_launch_activity")
         max_date_launch_activity = request.query_params.get("max_date_launch_activity")
+        date_launch_activity = request.query_params.get("date_launch_activity")
+        flight_operations_staff_id = request.query_params.get(
+            "flight_operations_staff_id"
+        )
+        flight_id = request.query_params.get("flight_id")
 
         if booking__service_type:
             self.filters["booking__service_type"] = booking__service_type
@@ -1563,10 +1568,10 @@ class PaymentPagination(PageNumberPagination):
         if status:
             self.filters["status"] = status
 
-        if activity_id:
-            self.filters[
-                "booking__activity_date_detail__activity_date__activity_package__activity_id"
-            ] = activity_id
+        if activity_date_id:
+            self.filters["booking__activity_date_detail__activity_date_id"] = (
+                activity_date_id
+            )
 
         if min_time_checkin_room:
             self.filters["booking__hotel_detail__check_in__gte"] = min_time_checkin_room
@@ -1591,6 +1596,23 @@ class PaymentPagination(PageNumberPagination):
                 max_date_launch_activity
             )
 
+        if date_launch_activity:
+            self.filters["booking__activity_date_detail__date_launch__date"] = (
+                date_launch_activity
+            )
+
+        if flight_operations_staff_id:
+            # chỉ áp dụng cho booking có service_type là FLIGHT
+            self.filters["booking__service_type"] = ServiceType.FLIGHT
+            self.filters[
+                "booking__flight_details__flight__airline__flight_operations_staff_id"
+            ] = flight_operations_staff_id
+
+        if flight_id:
+            # chỉ áp dụng cho booking có service_type là FLIGHT
+            self.filters["booking__service_type"] = ServiceType.FLIGHT
+            self.filters["booking__flight_details__flight_id"] = flight_id
+
         for field, value in request.query_params.items():
             if field not in [
                 "current",
@@ -1603,13 +1625,16 @@ class PaymentPagination(PageNumberPagination):
                 "driver_id",
                 "status",
                 "sort",
-                "activity_id",
+                "activity_date_id",
                 "min_time_checkin_room",
                 "max_time_checkin_room",
                 "min_time_checkout_room",
                 "max_time_checkout_room",
                 "min_date_launch_activity",
                 "max_date_launch_activity",
+                "date_launch_activity",
+                "flight_operations_staff_id",
+                "flight_id",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
@@ -1630,7 +1655,7 @@ class PaymentPagination(PageNumberPagination):
         return self.page_size
 
     def get_paginated_response(self, data):
-        total_count = Payment.objects.filter(**self.filters).count()
+        total_count = Payment.objects.filter(**self.filters).distinct().count()
         total_pages = math.ceil(total_count / self.page_size)
 
         self.filters.clear()
@@ -1701,16 +1726,30 @@ class PaymentListView(generics.ListAPIView):
                 booking__service_type=ServiceType.CAR,  # chỉ lọc khi service_type là CAR
             )
 
+        flight_operations_staff_id = filter_params.get("flight_operations_staff_id")
+        if flight_operations_staff_id:
+            query_filter &= Q(
+                booking__flight_details__flight__airline__flight_operations_staff_id=flight_operations_staff_id,
+                booking__service_type=ServiceType.FLIGHT,  # chỉ lọc khi service_type là FLIGHT
+            )
+
+        flight_id = filter_params.get("flight_id")
+        if flight_id:
+            query_filter &= Q(
+                booking__flight_details__flight_id=flight_id,
+                booking__service_type=ServiceType.FLIGHT,  # chỉ lọc khi service_type là FLIGHT
+            )
+
         status = filter_params.get("status")
         if status:
             query_filter &= Q(
                 status=status,
             )
 
-        activity_id = filter_params.get("activity_id")
-        if activity_id:
+        activity_date_id = filter_params.get("activity_date_id")
+        if activity_date_id:
             queryset = queryset.filter(
-                booking__activity_date_detail__activity_date__activity_package__activity_id=activity_id,
+                booking__activity_date_detail__activity_date_id=activity_date_id,
                 booking__service_type=ServiceType.ACTIVITY,
             )
 
@@ -1774,6 +1813,12 @@ class PaymentListView(generics.ListAPIView):
                 booking__activity_date_detail__date_launch__lte=max_date_launch_activity
             )
 
+        date_launch_activity = filter_params.get("date_launch_activity")
+        if date_launch_activity:
+            queryset = queryset.filter(
+                booking__activity_date_detail__date_launch__date=date_launch_activity
+            )
+
         for field, value in filter_params.items():
             if field not in [
                 "pageSize",
@@ -1786,13 +1831,16 @@ class PaymentListView(generics.ListAPIView):
                 "driver_id",
                 "status",
                 "sort",
-                "activity_id",
+                "activity_date_id",
                 "min_time_checkin_room",
                 "max_time_checkin_room",
                 "min_time_checkout_room",
                 "max_time_checkout_room",
                 "min_date_launch_activity",
                 "max_date_launch_activity",
+                "flight_operations_staff_id",
+                "flight_id",
+                "date_launch_activity",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
@@ -1826,7 +1874,7 @@ class PaymentListView(generics.ListAPIView):
         )  # Số phần tử mỗi trang, mặc định là 10
 
         # Áp dụng phân trang
-        paginator = Paginator(queryset, page_size)
+        paginator = Paginator(queryset.distinct(), page_size)
         page = paginator.get_page(current)
 
         return page
@@ -1847,10 +1895,12 @@ class PaymentListOverviewView(generics.ListAPIView):
         booking__service_ref_id = params.get("booking__service_ref_id")
         owner_hotel_id = params.get("owner_hotel_id")
         event_organizer_activity_id = params.get("event_organizer_activity_id")
+        flight_operations_staff_id = params.get("flight_operations_staff_id")
         driver_id = params.get("driver_id")
         hotel_id = params.get("hotel_id")
         activity_id = params.get("activity_id")
         car_id = params.get("car_id")
+        airline_id = params.get("airline_id")
 
         if min_date and max_date:
             queryset = queryset.filter(created_at__range=[min_date, max_date])
@@ -1883,6 +1933,12 @@ class PaymentListOverviewView(generics.ListAPIView):
                 booking__service_type=ServiceType.CAR,
             )
 
+        if flight_operations_staff_id:
+            queryset = queryset.filter(
+                booking__flight_details__flight__airline__flight_operations_staff_id=flight_operations_staff_id,
+                booking__service_type=ServiceType.FLIGHT,
+            )
+
         if hotel_id:
             queryset = queryset.filter(
                 booking__hotel_detail__room__hotel_id=hotel_id,
@@ -1899,6 +1955,12 @@ class PaymentListOverviewView(generics.ListAPIView):
             queryset = queryset.filter(
                 booking__car_detail__car_id=car_id,
                 booking__service_type=ServiceType.CAR,
+            )
+
+        if airline_id:
+            queryset = queryset.filter(
+                booking__flight_details__flight__airline_id=airline_id,
+                booking__service_type=ServiceType.FLIGHT,
             )
 
         return queryset.distinct()

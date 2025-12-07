@@ -3,10 +3,165 @@ from .views import (
     PromotionListCreateView,
     PromotionDetailView,
     PromotionCreateView,
+    PromotionListAdminView,
+    PromotionUpdateView,
+    PromotionDeleteView,
+    RoomPromotionListAdminView,
+    RoomPromotionAdminCreateView,
+    RoomPromotionAdminDetailView,
+    RoomPromotionAdminUpdateView,
+    RoomPromotionAdminDeleteView,
+    CarPromotionListAdminView,
+    CarPromotionAdminCreateView,
+    CarPromotionAdminDetailView,
+    CarPromotionAdminUpdateView,
+    CarPromotionAdminDeleteView,
+    FlightPromotionListAdminView,
+    FlightPromotionAdminCreateView,
+    FlightPromotionAdminDetailView,
+    FlightPromotionAdminUpdateView,
+    FlightPromotionAdminDeleteView,
+    ActivityPromotionListAdminView,
+    ActivityPromotionAdminCreateView,
+    ActivityPromotionAdminBulkCreateView,
+    ActivityPromotionAdminDetailView,
+    ActivityPromotionAdminUpdateView,
+    ActivityPromotionAdminDeleteView,
+    ActivityPromotionAdminBulkDeleteView,
 )
 
 urlpatterns = [
+    # promotion
     path("", PromotionListCreateView.as_view(), name="promotion-list-create"),
     path("<int:pk>/", PromotionDetailView.as_view(), name="promotion-detail"),
     path("create-details/", PromotionCreateView.as_view(), name="promotion-create"),
+    path(
+        "promotions-admin/",
+        PromotionListAdminView.as_view(),
+        name="promotion-list-admin",
+    ),
+    path(
+        "promotions/<int:pk>/update/",
+        PromotionUpdateView.as_view(),
+        name="promotion-update",
+    ),
+    path(
+        "promotions/<int:pk>/delete/",
+        PromotionDeleteView.as_view(),
+        name="promotion-delete",
+    ),
+    # room promotion
+    path(
+        "room-promotions/",
+        RoomPromotionListAdminView.as_view(),
+        name="room-promotion-list",
+    ),
+    path(
+        "room-promotions/create/",
+        RoomPromotionAdminCreateView.as_view(),
+        name="room-promotion-create",
+    ),
+    path(
+        "room-promotions/<int:pk>/",
+        RoomPromotionAdminDetailView.as_view(),
+        name="room-promotion-detail",
+    ),
+    path(
+        "room-promotions/<int:pk>/update/",
+        RoomPromotionAdminUpdateView.as_view(),
+        name="room-promotion-update",
+    ),
+    path(
+        "room-promotions/<int:pk>/delete/",
+        RoomPromotionAdminDeleteView.as_view(),
+        name="room-promotion-delete",
+    ),
+    # car promotion
+    path(
+        "car-promotions/",
+        CarPromotionListAdminView.as_view(),
+        name="car-promotion-list",
+    ),
+    path(
+        "car-promotions/create/",
+        CarPromotionAdminCreateView.as_view(),
+        name="car-promotion-create",
+    ),
+    path(
+        "car-promotions/<int:pk>/",
+        CarPromotionAdminDetailView.as_view(),
+        name="car-promotion-detail",
+    ),
+    path(
+        "car-promotions/<int:pk>/update/",
+        CarPromotionAdminUpdateView.as_view(),
+        name="car-promotion-update",
+    ),
+    path(
+        "car-promotions/<int:pk>/delete/",
+        CarPromotionAdminDeleteView.as_view(),
+        name="car-promotion-delete",
+    ),
+    # flight promotion
+    path(
+        "flight-promotions/",
+        FlightPromotionListAdminView.as_view(),
+        name="flight-promotion-list",
+    ),
+    path(
+        "flight-promotions/create/",
+        FlightPromotionAdminCreateView.as_view(),
+        name="flight-promotion-create",
+    ),
+    path(
+        "flight-promotions/<int:pk>/",
+        FlightPromotionAdminDetailView.as_view(),
+        name="flight-promotion-detail",
+    ),
+    path(
+        "flight-promotions/<int:pk>/update/",
+        FlightPromotionAdminUpdateView.as_view(),
+        name="flight-promotion-update",
+    ),
+    path(
+        "flight-promotions/<int:pk>/delete/",
+        FlightPromotionAdminDeleteView.as_view(),
+        name="flight-promotion-delete",
+    ),
+    # activity promotion
+    path(
+        "activity-promotions/",
+        ActivityPromotionListAdminView.as_view(),
+        name="activity-promotion-list",
+    ),
+    path(
+        "activity-promotions/create/",
+        ActivityPromotionAdminCreateView.as_view(),
+        name="activity-promotion-create",
+    ),
+    path(
+        "activity-promotions/create/bulk/",
+        ActivityPromotionAdminBulkCreateView.as_view(),
+        name="activity-promotions-create-bulk",
+    ),
+    path(
+        "activity-promotions/<int:pk>/",
+        ActivityPromotionAdminDetailView.as_view(),
+        name="activity-promotion-detail",
+    ),
+    path(
+        "activity-promotions/<int:pk>/update/",
+        ActivityPromotionAdminUpdateView.as_view(),
+        name="activity-promotion-update",
+    ),
+    path(
+        "activity-promotions/<int:pk>/delete/",
+        ActivityPromotionAdminDeleteView.as_view(),
+        name="activity-promotion-delete",
+    ),
+    path(
+        "activity-promotions/bulk-delete/",
+        ActivityPromotionAdminBulkDeleteView.as_view(),
+        name="activity-promotion-bulk-delete",
+    ),
 ]

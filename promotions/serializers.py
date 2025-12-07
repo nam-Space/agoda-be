@@ -1,8 +1,21 @@
 from rest_framework import serializers
-from .models import Promotion, FlightPromotion, ActivityPromotion, RoomPromotion, CarPromotion
-from flights.serializers import FlightSimpleSerializer
+from .models import (
+    Promotion,
+    FlightPromotion,
+    ActivityPromotion,
+    RoomPromotion,
+    CarPromotion,
+)
+from flights.serializers import FlightSimpleSerializer, FlightGetListSerializer
+from flights.models import Flight
 from cars.models import Car
+from cars.serializers import CarSerializer
 from datetime import datetime
+from rooms.serializers import RoomSerializer
+from rooms.models import Room
+from activities.models import ActivityDate
+from activities.serializers import ActivityDateSerializer
+
 
 class FlightPromotionSerializer(serializers.ModelSerializer):
     flight = FlightSimpleSerializer(read_only=True)
@@ -20,20 +33,21 @@ class FlightPromotionSerializer(serializers.ModelSerializer):
             "effective_discount_percent",
             "effective_discount_amount",
         ]
+
     def get_effective_discount_percent(self, obj):
         return obj.discount_percent or obj.promotion.discount_percent
 
     def get_effective_discount_amount(self, obj):
         return obj.discount_amount or obj.promotion.discount_amount
-    
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         flight = instance.flight
 
         # Get first and last leg for filtering
-        first_leg = flight.legs.order_by('departure_time').first()
-        last_leg = flight.legs.order_by('arrival_time').last()
-        
+        first_leg = flight.legs.order_by("departure_time").first()
+        last_leg = flight.legs.order_by("arrival_time").last()
+
         if not first_leg or not last_leg:
             return None
 
@@ -66,8 +80,11 @@ class FlightPromotionSerializer(serializers.ModelSerializer):
 
         return data
 
+
 class ActivityPromotionSerializer(serializers.ModelSerializer):
-    activity_date_id = serializers.IntegerField(source='activity_date.id', read_only=True, allow_null=True)
+    activity_date_id = serializers.IntegerField(
+        source="activity_date.id", read_only=True, allow_null=True
+    )
     effective_discount_percent = serializers.SerializerMethodField()
     effective_discount_amount = serializers.SerializerMethodField()
 
@@ -111,7 +128,9 @@ class ActivityPromotionSerializer(serializers.ModelSerializer):
             return None
         if category and getattr(activity, "category", "") != category:
             return None
-        if min_rating and float(getattr(activity, "avg_star", 0) or 0) < float(min_rating):
+        if min_rating and float(getattr(activity, "avg_star", 0) or 0) < float(
+            min_rating
+        ):
             return None
         if min_price:
             try:
@@ -129,7 +148,9 @@ class ActivityPromotionSerializer(serializers.ModelSerializer):
         # optional date range: check related ActivityDate if exists
         if start_date or end_date:
             try:
-                dates_qs = activity.activitypackage_set.prefetch_related("activitydate_set").all()
+                dates_qs = activity.activitypackage_set.prefetch_related(
+                    "activitydate_set"
+                ).all()
                 has_date_in_range = False
                 for pkg in dates_qs:
                     for ad in getattr(pkg, "activitydate_set", []).all():
@@ -157,13 +178,17 @@ class ActivityPromotionSerializer(serializers.ModelSerializer):
 
         if search:
             s = search.lower()
-            if s not in (getattr(activity, "name", "") or "").lower() and s not in (getattr(activity, "short_description", "") or "").lower():
+            if (
+                s not in (getattr(activity, "name", "") or "").lower()
+                and s not in (getattr(activity, "short_description", "") or "").lower()
+            ):
                 return None
 
         # remove internal fields if needed
         data.pop("some_internal_field", None)
 
         return data
+
 
 class RoomPromotionSerializer(serializers.ModelSerializer):
     effective_discount_percent = serializers.SerializerMethodField()
@@ -188,10 +213,20 @@ class RoomPromotionSerializer(serializers.ModelSerializer):
     def get_effective_discount_amount(self, obj):
         return obj.discount_amount or obj.promotion.discount_amount
 
+
 class CarSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Car
-        fields = ["id", "name", "capacity", "luggage", "price_per_km", "avg_star", "image"]
+        fields = [
+            "id",
+            "name",
+            "capacity",
+            "luggage",
+            "price_per_km",
+            "avg_star",
+            "image",
+        ]
+
 
 class CarPromotionSerializer(serializers.ModelSerializer):
     car = CarSimpleSerializer(read_only=True)
@@ -216,34 +251,40 @@ class CarPromotionSerializer(serializers.ModelSerializer):
     def get_effective_discount_amount(self, obj):
         return obj.discount_amount or obj.promotion.discount_amount
 
+
 # Serializers cho cấu trúc mới khi tạo promotion
 class RoomPromotionItemSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    discount_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
-    discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    discount_percent = serializers.FloatField(required=False)
+    discount_amount = serializers.FloatField(required=False)
+
 
 class FlightPromotionItemSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    discount_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
-    discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    discount_percent = serializers.FloatField(required=False)
+    discount_amount = serializers.FloatField(required=False)
+
 
 class ActivityDatePromotionItemSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    discount_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
-    discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    discount_percent = serializers.FloatField(required=False)
+    discount_amount = serializers.FloatField(required=False)
+
 
 class CarPromotionItemSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    discount_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
-    discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    discount_percent = serializers.FloatField(required=False)
+    discount_amount = serializers.FloatField(required=False)
+
 
 class PromotionSerializer(serializers.ModelSerializer):
-    promotion_type_display = serializers.CharField(source="get_promotion_type_display", read_only=True)
+    promotion_type_display = serializers.CharField(
+        source="get_promotion_type_display", read_only=True
+    )
     flight_promotions = FlightPromotionSerializer(many=True, read_only=True)
     activity_promotions = ActivityPromotionSerializer(many=True, read_only=True)
     room_promotions = RoomPromotionSerializer(many=True, read_only=True)
     car_promotions = CarPromotionSerializer(many=True, read_only=True)
-    image = serializers.ImageField(required=False)
 
     class Meta:
         model = Promotion
@@ -258,7 +299,7 @@ class PromotionSerializer(serializers.ModelSerializer):
             "is_active",
             "promotion_type",
             "promotion_type_display",
-            "image", 
+            "image",
             "created_at",
             "flight_promotions",
             "activity_promotions",
@@ -288,46 +329,152 @@ class PromotionSerializer(serializers.ModelSerializer):
 
         return data
 
+
 # Serializer chung để tạo promotion với cấu trúc mới
 class PromotionCreateSerializer(serializers.Serializer):
-    promotion_id = serializers.IntegerField()
-    type = serializers.ChoiceField(choices=['hotel', 'flight', 'activity', 'car'])
-    
+    # promotion_id = serializers.IntegerField()
+    type = serializers.ChoiceField(choices=["hotel", "flight", "activity", "car"])
+
+    # Common promotion fields
+    title = serializers.CharField(required=True)
+    description = serializers.CharField(required=False, allow_blank=True)
+    discount_percent = serializers.FloatField(required=False)
+    discount_amount = serializers.FloatField(required=False)
+    start_date = serializers.DateTimeField(required=True)
+    end_date = serializers.DateTimeField(required=True)
+    image = serializers.CharField(required=False, allow_blank=True)
+
     # Hotel fields
     hotel_id = serializers.IntegerField(required=False)
     rooms = RoomPromotionItemSerializer(many=True, required=False)
-    
+
     # Flight fields
     airline_id = serializers.IntegerField(required=False)
     flights = FlightPromotionItemSerializer(many=True, required=False)
-    
+
     # Activity fields (chỉ dùng cho ActivityDate)
     activity_id = serializers.IntegerField(required=False)
     activity_package = serializers.IntegerField(required=False)
     actDates = ActivityDatePromotionItemSerializer(many=True, required=False)
-    
+
     # Car fields
     cars = CarPromotionItemSerializer(many=True, required=False)
-    
+
     def validate(self, data):
-        promotion_type = data.get('type')
-        
-        if promotion_type == 'hotel':
-            if not data.get('hotel_id'):
-                raise serializers.ValidationError("hotel_id is required for hotel promotion")
-            if not data.get('rooms'):
-                raise serializers.ValidationError("rooms is required for hotel promotion")
-        elif promotion_type == 'flight':
-            if not data.get('airline_id'):
-                raise serializers.ValidationError("airline_id is required for flight promotion")
-            if not data.get('flights'):
-                raise serializers.ValidationError("flights is required for flight promotion")
-        elif promotion_type == 'activity':
+        promotion_type = data.get("type")
+
+        if promotion_type == "hotel":
+            # if not data.get("hotel_id"):
+            #     raise serializers.ValidationError(
+            #         "hotel_id is required for hotel promotion"
+            #     )
+            if not data.get("rooms"):
+                raise serializers.ValidationError(
+                    "rooms is required for hotel promotion"
+                )
+        elif promotion_type == "flight":
+            # if not data.get("airline_id"):
+            #     raise serializers.ValidationError(
+            #         "airline_id is required for flight promotion"
+            #     )
+            if not data.get("flights"):
+                raise serializers.ValidationError(
+                    "flights is required for flight promotion"
+                )
+        elif promotion_type == "activity":
             # Chỉ hỗ trợ actDates (ActivityDate)
-            if not data.get('actDates'):
-                raise serializers.ValidationError("actDates is required for activity promotion")
-        elif promotion_type == 'car':
-            if not data.get('cars'):
+            if not data.get("actDates"):
+                raise serializers.ValidationError(
+                    "actDates is required for activity promotion"
+                )
+        elif promotion_type == "car":
+            if not data.get("cars"):
                 raise serializers.ValidationError("cars is required for car promotion")
-        
+
         return data
+
+
+class PromotionAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Promotion
+        fields = "__all__"
+
+
+class PromotionAdminCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Promotion
+        fields = "__all__"
+
+
+class RoomPromotionAdminSerializer(serializers.ModelSerializer):
+    promotion = PromotionAdminSerializer(read_only=True)
+    room = RoomSerializer(read_only=True)
+
+    class Meta:
+        model = RoomPromotion
+        fields = "__all__"
+
+
+class RoomPromotionAdminCreateSerializer(serializers.ModelSerializer):
+    promotion = serializers.PrimaryKeyRelatedField(queryset=Promotion.objects.all())
+    room = serializers.PrimaryKeyRelatedField(queryset=Room.objects.all())
+
+    class Meta:
+        model = RoomPromotion
+        fields = "__all__"
+
+
+class CarPromotionAdminSerializer(serializers.ModelSerializer):
+    promotion = PromotionAdminSerializer(read_only=True)
+    car = CarSerializer(read_only=True)
+
+    class Meta:
+        model = CarPromotion
+        fields = "__all__"
+
+
+class CarPromotionAdminCreateSerializer(serializers.ModelSerializer):
+    promotion = serializers.PrimaryKeyRelatedField(queryset=Promotion.objects.all())
+    car = serializers.PrimaryKeyRelatedField(queryset=Car.objects.all())
+
+    class Meta:
+        model = CarPromotion
+        fields = "__all__"
+
+
+class FlightPromotionAdminSerializer(serializers.ModelSerializer):
+    promotion = PromotionAdminSerializer(read_only=True)
+    flight = FlightGetListSerializer(read_only=True)
+
+    class Meta:
+        model = FlightPromotion
+        fields = "__all__"
+
+
+class FlightPromotionAdminCreateSerializer(serializers.ModelSerializer):
+    promotion = serializers.PrimaryKeyRelatedField(queryset=Promotion.objects.all())
+    flight = serializers.PrimaryKeyRelatedField(queryset=Flight.objects.all())
+
+    class Meta:
+        model = FlightPromotion
+        fields = "__all__"
+
+
+class ActivityPromotionAdminSerializer(serializers.ModelSerializer):
+    promotion = PromotionAdminSerializer(read_only=True)
+    activity_date = ActivityDateSerializer(read_only=True)
+
+    class Meta:
+        model = ActivityPromotion
+        fields = "__all__"
+
+
+class ActivityPromotionAdminCreateSerializer(serializers.ModelSerializer):
+    promotion = serializers.PrimaryKeyRelatedField(queryset=Promotion.objects.all())
+    activity_date = serializers.PrimaryKeyRelatedField(
+        queryset=ActivityDate.objects.all()
+    )
+
+    class Meta:
+        model = ActivityPromotion
+        fields = "__all__"

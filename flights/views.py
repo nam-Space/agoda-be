@@ -53,10 +53,20 @@ class FlightListView(generics.ListAPIView):
 
         # Duyệt qua các tham số query để tạo bộ lọc cho mỗi trường
         for field, value in filter_params.items():
-            if field != "current" and field != "pageSize" and field != "sort":
+            if (
+                field != "current"
+                and field != "pageSize"
+                and field != "sort"
+                and field != "airline_id"
+                and field != "flight_operations_staff_id"
+            ):
                 query_filter &= Q(
                     **{f"{field}__icontains": value}
                 )  # Thêm điều kiện lọc cho mỗi trường
+            if field == "airline_id":
+                query_filter &= Q(**{f"{field}": value})
+            if field == "flight_operations_staff_id":
+                query_filter &= Q(**{f"airline__flight_operations_staff_id": value})
 
         queryset = queryset.filter(query_filter)
 

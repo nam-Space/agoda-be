@@ -6,6 +6,7 @@ from accounts.models import CustomUser
 import math
 from django.utils import timezone
 
+
 # Model hoạt động
 class Activity(models.Model):
     event_organizer = models.ForeignKey(
@@ -155,28 +156,34 @@ class ActivityDate(models.Model):
 
     def __str__(self):
         return f"{self.date_launch}, {self.activity_package.name}"
-    
+
     def get_active_promotion(self):
         """Lấy promotion active cho ActivityDate này"""
         from promotions.models import ActivityPromotion
+
         now = timezone.now()
         activity_promotions = self.promotions.select_related("promotion").all()
 
         # Chỉ lấy những promotion đang active và liên kết với ActivityDate này
         active_promos = [
-            ap for ap in activity_promotions
-            if ap.promotion.is_active 
+            ap
+            for ap in activity_promotions
+            if ap.promotion.is_active
             and ap.promotion.start_date <= now <= ap.promotion.end_date
             and ap.activity_date_id == self.id
         ]
-        
+
         if not active_promos:
             return None
 
         # Lấy promotion có discount lớn nhất
         best_promo = max(
             active_promos,
-            key=lambda ap: ap.discount_percent if ap.discount_percent is not None else (ap.promotion.discount_percent or 0)
+            key=lambda ap: (
+                ap.discount_percent
+                if ap.discount_percent is not None
+                else (ap.promotion.discount_percent or 0)
+            ),
         )
 
         promo = best_promo.promotion
@@ -235,19 +242,18 @@ class ActivityDateBookingDetail(models.Model):
             )
 
         # Tính total_price từ giá và số lượng
-        self.total_price = (
-            (self.price_adult or 0) * (self.adult_quantity_booking or 0)
-            + (self.price_child or 0) * (self.child_quantity_booking or 0)
-        )
+        self.total_price = (self.price_adult or 0) * (
+            self.adult_quantity_booking or 0
+        ) + (self.price_child or 0) * (self.child_quantity_booking or 0)
 
         # Lấy promotion từ ActivityDate (chỉ áp dụng promotion cho ActivityDate)
         promo = None
-        if self.activity_date and hasattr(self.activity_date, 'get_active_promotion'):
+        if self.activity_date and hasattr(self.activity_date, "get_active_promotion"):
             promo = self.activity_date.get_active_promotion()
 
         if promo:
-            percent = float(promo.get('discount_percent') or 0)
-            amount = float(promo.get('discount_amount') or 0)
+            percent = float(promo.get("discount_percent") or 0)
+            amount = float(promo.get("discount_amount") or 0)
             if amount > 0:
                 self.discount_amount = min(amount, float(self.total_price))
             elif percent > 0:
@@ -265,11 +271,24 @@ class ActivityDateBookingDetail(models.Model):
         # Tổng hợp discount/final_price lên booking nếu có nhiều activity detail (giả sử dùng service_ref_ids)
         if self.booking_id:
             from django.db.models import Sum
+
             BookingModel = type(self.booking)
             BookingModel.objects.filter(pk=self.booking_id).update(
-                discount_amount=self.booking.activity_date_detail.discount_amount if hasattr(self.booking, 'activity_date_detail') else 0,
-                final_price=self.booking.activity_date_detail.final_price if hasattr(self.booking, 'activity_date_detail') else 0,
-                total_price=self.booking.activity_date_detail.total_price if hasattr(self.booking, 'activity_date_detail') else 0
+                discount_amount=(
+                    self.booking.activity_date_detail.discount_amount
+                    if hasattr(self.booking, "activity_date_detail")
+                    else 0
+                ),
+                final_price=(
+                    self.booking.activity_date_detail.final_price
+                    if hasattr(self.booking, "activity_date_detail")
+                    else 0
+                ),
+                total_price=(
+                    self.booking.activity_date_detail.total_price
+                    if hasattr(self.booking, "activity_date_detail")
+                    else 0
+                ),
             )
 
     def __str__(self):

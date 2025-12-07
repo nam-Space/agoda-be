@@ -28,8 +28,11 @@ class GuestInfoSerializer(serializers.ModelSerializer):
         model = GuestInfo
         fields = ["full_name", "email", "phone", "country", "special_request"]
 
+
 class BookingSerializer(serializers.ModelSerializer):
-    service_ref_ids = serializers.ListField(child=serializers.IntegerField(), required=False, allow_null=True)
+    service_ref_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False, allow_null=True
+    )
     guest_info = GuestInfoSerializer(required=False)
     user = UserSerializer(read_only=True)
 
@@ -37,7 +40,6 @@ class BookingSerializer(serializers.ModelSerializer):
     car_detail = serializers.SerializerMethodField()
     activity_date_detail = serializers.SerializerMethodField()
     flight_detail = serializers.SerializerMethodField()
-
 
     class Meta:
         model = Booking
@@ -62,30 +64,46 @@ class BookingSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "status", "payment_status", "created_at"]
 
-
     def get_room_details(self, obj):
         if obj.service_type != ServiceType.HOTEL or not obj.service_ref_ids:
             return None
-        room_booking_details = RoomBookingDetail.objects.filter(id__in=obj.service_ref_ids)
-        return RoomBookingDetailSerializer(room_booking_details, many=True, context=self.context).data
+        room_booking_details = RoomBookingDetail.objects.filter(
+            id__in=obj.service_ref_ids
+        )
+        return RoomBookingDetailSerializer(
+            room_booking_details, many=True, context=self.context
+        ).data
 
     def get_car_detail(self, obj):
         if obj.service_type != ServiceType.CAR or not obj.service_ref_ids:
             return None
-        car_booking_details = CarBookingDetail.objects.filter(id__in=obj.service_ref_ids)
-        return CarBookingDetailSerializer(car_booking_details, many=True, context=self.context).data
+        car_booking_details = CarBookingDetail.objects.filter(
+            id__in=obj.service_ref_ids
+        )
+        return CarBookingDetailSerializer(
+            car_booking_details, many=True, context=self.context
+        ).data
 
     def get_flight_detail(self, obj):
         if obj.service_type != ServiceType.FLIGHT or not obj.service_ref_ids:
             return None
         flight_booking_details = obj.flight_details.all()
-        return FlightBookingDetailSerializer(flight_booking_details, many=True, context=self.context).data
+        # flight_booking_details = FlightBookingDetail.objects.filter(
+        #     id__in=obj.service_ref_ids
+        # )
+        return FlightBookingDetailSerializer(
+            flight_booking_details, many=True, context=self.context
+        ).data
 
     def get_activity_date_detail(self, obj):
         if obj.service_type != ServiceType.ACTIVITY or not obj.service_ref_ids:
             return None
-        activity_date_booking_details = ActivityDateBookingDetail.objects.filter(id__in=obj.service_ref_ids)
-        return ActivityDateBookingDetailSerializer(activity_date_booking_details, many=True, context=self.context).data
+        activity_date_booking_details = ActivityDateBookingDetail.objects.filter(
+            id__in=obj.service_ref_ids
+        )
+        return ActivityDateBookingDetailSerializer(
+            activity_date_booking_details, many=True, context=self.context
+        ).data
 
     def create(self, validated_data):
         guest_data = validated_data.pop("guest_info", None)
