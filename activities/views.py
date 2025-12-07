@@ -592,13 +592,21 @@ class ActivityPackagePagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
 
         for field, value in request.query_params.items():
-            if field not in ["current", "pageSize", "event_organizer_id", "sort"]:
+            if field not in [
+                "current",
+                "pageSize",
+                "event_organizer_id",
+                "sort",
+                "activity_id",
+            ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
 
             if field in ["event_organizer_id"]:
                 self.filters["activity__event_organizer_id"] = value
-                # print(f"activity__event_organizer_id={value}")
+
+            if field in ["activity_id"]:
+                self.filters["activity_id"] = value
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
         try:
@@ -658,12 +666,16 @@ class ActivityPackageListView(generics.ListAPIView):
                 "current",
                 "sort",
                 "event_organizer_id",
+                "activity_id",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
             # ✅ Nếu là event_organizer_id, lọc theo quan hệ ngược từ Activity
             if field in ["event_organizer_id"]:
                 query_filter &= Q(activity__event_organizer_id=value)
+
+            if field in ["activity_id"]:
+                query_filter &= Q(activity_id=value)
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
@@ -874,15 +886,48 @@ class ActivityDatePagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
 
         for field, value in request.query_params.items():
-            if field not in ["current", "pageSize", "event_organizer_id", "sort"]:
+            if field not in [
+                "current",
+                "pageSize",
+                "event_organizer_id",
+                "sort",
+                "activity_id",
+                "activity_package_id",
+                "min_date_launch",
+                "max_date_launch",
+                "date_launch",
+            ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
 
             if field in [
                 "event_organizer_id",
             ]:
-                # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters["activity_package__activity__event_organizer_id"] = value
+
+            if field in [
+                "activity_id",
+            ]:
+                self.filters["activity_package__activity_id"] = value
+
+            if field in [
+                "activity_package_id",
+            ]:
+                self.filters["activity_package_id"] = value
+
+            if field in [
+                "min_date_launch",
+            ]:
+                self.filters["date_launch__gte"] = value
+
+            if field in [
+                "max_date_launch",
+            ]:
+                self.filters["date_launch__lte"] = value
+            if field in [
+                "date_launch",
+            ]:
+                self.filters["date_launch__date"] = value
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
         try:
@@ -941,14 +986,35 @@ class ActivityDateListView(generics.ListAPIView):
                 "pageSize",
                 "current",
                 "event_organizer_id",
+                "activity_id",
+                "activity_package_id",
                 "sort",
+                "min_date_launch",
+                "max_date_launch",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
-            if field in ["event_organizer_id"]:  # Bỏ qua các trường phân trang
+            if field in ["event_organizer_id"]:
                 query_filter &= Q(
                     **{"activity_package__activity__event_organizer_id": value}
                 )
+
+            if field in ["activity_id"]:
+                query_filter &= Q(**{"activity_package__activity_id": value})
+
+            if field in ["activity_package_id"]:
+                query_filter &= Q(**{"activity_package_id": value})
+
+        min_date_launch = filter_params.get("min_date_launch")
+        max_date_launch = filter_params.get("max_date_launch")
+        date_launch = filter_params.get("date_launch")
+
+        if min_date_launch:
+            queryset = queryset.filter(date_launch__gte=min_date_launch)
+        if max_date_launch:
+            queryset = queryset.filter(date_launch__lte=max_date_launch)
+        if date_launch:
+            queryset = queryset.filter(date_launch__date=date_launch)
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)

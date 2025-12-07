@@ -54,6 +54,7 @@ class RoomListView(generics.ListAPIView):
         queryset = Room.objects.all()
         filter_params = self.request.query_params
         hotel_id = filter_params.get("hotel_id")
+        owner_id = filter_params.get("owner_id")
         hotel_name = filter_params.get("hotel_name")
         adults = filter_params.get("adults")
         children = filter_params.get("children")
@@ -63,6 +64,9 @@ class RoomListView(generics.ListAPIView):
         try:
             if hotel_id:
                 queryset = queryset.filter(hotel_id=int(hotel_id))
+
+            if owner_id:
+                queryset = queryset.filter(hotel__owner_id=int(owner_id))
 
             if hotel_name:
                 queryset = queryset.filter(hotel__name__icontains=hotel_name)

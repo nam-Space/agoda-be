@@ -1,7 +1,15 @@
 from django.db import models
+from accounts.models import CustomUser
 
 
 class Airline(models.Model):
+    flight_operations_staff = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        related_name="airlines",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(max_length=100, unique=True)
     code = models.CharField(
         max_length=10, unique=True, help_text="Mã IATA (VD: VN, VJ)"
