@@ -32,9 +32,8 @@ class Hotel(models.Model):
     regulation = models.TextField(blank=True)
     avg_star = models.FloatField(default=0.0)
     review_count = models.PositiveIntegerField(default=0)
-    min_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True, default=0
-    )
+    min_price = models.FloatField(default=0.0)
+    best_comment = models.TextField(blank=True, null=True)
 
     # ✅ Thêm các trường thống kê hành vi
     total_click = models.PositiveIntegerField(default=0)

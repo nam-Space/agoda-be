@@ -275,6 +275,7 @@ class PromotionDetailView(generics.RetrieveUpdateDestroyAPIView):
 
                         activity_map[activity_id] = {
                             "id": activity.id,
+                            "name": activity.name,
                             "review_count": activity.review_count,
                             "avg_star": activity.avg_star,
                             "avg_price": activity.avg_price,
