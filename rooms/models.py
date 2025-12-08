@@ -143,7 +143,7 @@ class RoomBookingDetail(models.Model):
         null=True,
         blank=True,
     )
-    total_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_price = models.FloatField(default=0.0)
     discount_amount = models.FloatField(default=0.0)
     final_price = models.FloatField(default=0.0)
 
