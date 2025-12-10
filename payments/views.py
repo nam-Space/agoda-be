@@ -18,13 +18,15 @@ from payments.constants.payment_method import PaymentMethod
 from bookings.constants.service_type import ServiceType
 from bookings.constants.booking_status import BookingStatus
 from django.db.models.functions import TruncDay, TruncMonth, TruncQuarter, TruncYear
-from django.db.models import Sum
+from django.db.models import Sum, Min, Max
 from datetime import timedelta
 from accounts.models import CustomUser
 from django.core.files.storage import default_storage
 import os
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
+front_url = settings.FRONT_END_URL
+admin_url = settings.ADMIN_URL
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
@@ -726,6 +728,468 @@ class PaymentViewSet(viewsets.ModelViewSet):
                             send_mail_flag=False,
                         )
 
+                elif booking.service_type == ServiceType.FLIGHT:
+                    flight_details = booking.flight_details.all()
+
+                    if not flight_details.exists():
+                        return
+
+                    # Hàm lấy leg đầu và cuối
+                    def get_flight_info(fd):
+                        flight = fd.flight
+                        first_leg = flight.legs.order_by("departure_time").first()
+                        last_leg = flight.legs.order_by("arrival_time").last()
+                        return first_leg, last_leg
+
+                    # Hàm render 1 chiều
+                    def render_one_way(fd):
+                        first_leg, last_leg = get_flight_info(fd)
+
+                        # Nếu không có legs → thông báo lỗi an toàn
+                        if first_leg is None or last_leg is None:
+                            return "<div>Chuyến bay chưa cập nhật lộ trình</div>"
+
+                        return f"""
+                        <div class="border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]">
+                        <div class="flex-shrink-0">
+                            <img src="{baseUrl}{fd.flight.airline.logo}" alt="{fd.flight.airline.name}" class="w-[50px] h-[50px] object-cover rounded-lg">
+                        </div>
+
+                        <div class="flex-grow">
+                            <h3 class="text-gray-900 mb-[6px] leading-[18px]">
+                                <div>Mã:
+                                    <span class="text-blue-500 font-semibold"> {booking.booking_code}</span>
+                                </div>
+                                <span>Chuyến bay </span>
+                                <span class="font-bold text-yellow-600">một chiều</span>:
+                                <span class="font-bold">{first_leg.departure_airport.name}</span> →
+                                <span class="font-bold">{last_leg.arrival_airport.name}</span>
+                            </h3>
+
+                            <div class="flex gap-[20px]">
+                                <div>
+                                    <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                    <p class="font-semibold text-[12px] text-gray-900">{first_leg.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                    <p class="font-semibold text-[12px] text-gray-900">{last_leg.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                        """
+
+                    # Hàm render khứ hồi
+                    def render_round_trip(go, ret):
+                        go_first, go_last = get_flight_info(go)
+                        ret_first, ret_last = get_flight_info(ret)
+
+                        if None in (go_first, go_last, ret_first, ret_last):
+                            return "<div>Chuyến bay chưa cập nhật đủ lộ trình</div>"
+
+                        return f"""
+                        <div class="border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]">
+                            <div class="flex-shrink-0">
+                                <img src="{baseUrl}{go.flight.airline.logo}" alt="{go.flight.airline.name}" class="w-[50px] h-[50px] object-cover rounded-lg">
+                            </div>
+
+                            <div class="flex-grow">
+                                <h3 class="text-gray-900 mb-[6px] leading-[18px]">
+                                    <div>Mã:
+                                        <span class="text-blue-500 font-semibold"> {booking.booking_code}</span>
+                                    </div>
+                                    <span>Chuyến bay </span>
+                                    <span class="font-bold text-green-600">khứ hồi</span>:
+                                    <span class="font-bold">{go_first.departure_airport.name}</span> →
+                                    <span class="font-bold">{go_last.arrival_airport.name}</span>
+                                </h3>
+
+                                <!-- CHIỀU ĐI -->
+                                <div>
+                                    <div class="flex items-center gap-[10px]">
+                                        <p class="font-semibold text-[14px] text-blue-600">Chiều đi:</p>
+                                        <div class="flex items-center gap-[2px]">
+                                        <img src="{baseUrl}{go.flight.airline.logo}" alt="{go.flight.airline.name}" class="w-[24px]">
+                                        <p class="text-[12px] text-gray-500">{go.flight.airline.name}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-[20px]">
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{go_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{go_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CHIỀU VỀ -->
+                                <div class="mt-[14px]">
+                                    <div class="flex items-center gap-[10px]">
+                                        <p class="font-semibold text-[14px] text-red-600">Chiều về:</p>
+                                        <div class="flex items-center gap-[2px]">
+                                        <img src="{baseUrl}{ret.flight.airline.logo}" alt="{ret.flight.airline.name}" class="w-[24px]">
+                                        <p class="text-[12px] text-gray-500">{ret.flight.airline.name}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-[20px]">
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{ret_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{ret_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        """
+
+                    def render_one_way_admin(fd, booking, baseUrl):
+                        first_leg, last_leg = get_flight_info(fd)
+
+                        # Nếu không có legs → thông báo lỗi an toàn
+                        if first_leg is None or last_leg is None:
+                            return "<div>Chuyến bay chưa cập nhật lộ trình</div>"
+
+                        customer_name = (
+                            booking.guest_info.full_name
+                            if booking.guest_info
+                            else "Khách lẻ"
+                        )
+                        customer_avatar = baseUrl + (
+                            booking.user.avatar
+                            if booking.user and booking.user.avatar
+                            else "/media/user_images/default-avatar.png"
+                        )
+
+                        return f"""
+                        <div class="border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]">
+                            <div class="flex-shrink-0">
+                                <img src="{baseUrl}{fd.flight.airline.logo}" alt="{fd.flight.airline.name}" class="w-[50px] h-[50px] object-cover rounded-lg">
+                            </div>
+
+                            <div class="flex-grow">
+                                <h3 class="text-gray-900 mb-[6px] leading-[18px]">
+                                    <div>Mã:
+                                        <span class="text-blue-500 font-semibold"> {booking.booking_code}</span>
+                                    </div>
+
+                                    <span>Khách hàng </span>
+                                    <span class="font-bold text-blue-700">{customer_name} </span>
+                                    <span>đã đặt chuyến bay </span>
+                                    <span class="font-bold text-yellow-600">một chiều</span>:
+                                    <span class="font-bold">{first_leg.departure_airport.name}</span> →
+                                    <span class="font-bold">{last_leg.arrival_airport.name}</span>
+                                </h3>
+
+                                <div class="flex gap-[20px]">
+                                    <div class="flex items-center gap-[4px]">
+                                        <img src="{customer_avatar}" class="w-[24px] h-[24px] object-cover rounded-[50%]" alt="{customer_name}">
+                                        <div>
+                                            <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                            <p class="font-semibold text-[12px] text-gray-900">{first_leg.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{last_leg.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        """
+
+                    def render_round_trip_admin(go, ret, booking, baseUrl):
+                        go_first, go_last = get_flight_info(go)
+                        ret_first, ret_last = get_flight_info(ret)
+
+                        customer_name = (
+                            booking.guest_info.full_name
+                            if booking.guest_info
+                            else "Khách lẻ"
+                        )
+                        customer_avatar = baseUrl + (
+                            booking.user.avatar
+                            if booking.user and booking.user.avatar
+                            else "/media/user_images/default-avatar.png"
+                        )
+
+                        return f"""
+                        <div class="border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]">
+                            <div class="flex-shrink-0">
+                                <img src="{baseUrl}{go.flight.airline.logo}" alt="{go.flight.airline.name}" class="w-[50px] h-[50px] object-cover rounded-lg">
+                            </div>
+
+                            <div class="flex-grow">
+                                <h3 class="text-gray-900 mb-[6px] leading-[18px]">
+                                    <div>Mã:
+                                        <span class="text-blue-500 font-semibold"> {booking.booking_code}</span>
+                                    </div>
+
+                                    <span>Khách hàng </span>
+                                    <span class="font-bold text-blue-700">{customer_name} </span>
+                                    <span>đã đặt chuyến bay </span>
+                                    <span class="font-bold text-green-600">khứ hồi</span>:
+                                    <span class="font-bold">{go_first.departure_airport.name}</span> →
+                                    <span class="font-bold">{go_last.arrival_airport.name}</span>
+                                </h3>
+
+                                <!-- CHIỀU ĐI -->
+                                <div>
+                                    <div class="flex items-center gap-[10px]">
+                                        <p class="font-semibold text-[14px] text-blue-600">Chiều đi:</p>
+                                        <div class="flex items-center gap-[2px]">
+                                            <img src="{baseUrl}{go.flight.airline.logo}" class="w-[24px]" alt="{go.flight.airline.name}">
+                                            <p class="text-[12px] text-gray-500">{go.flight.airline.name}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-[20px]">
+                                        <div class="flex items-center gap-[4px]">
+                                            <img src="{customer_avatar}" class="w-[24px] h-[24px] object-cover rounded-[50%]" alt="{customer_name}">
+                                            <div>
+                                                <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                                <p class="font-semibold text-[12px] text-gray-900">{go_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                            <p class="font-semibold text-[12px] text-gray-900">{go_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CHIỀU VỀ -->
+                                <div class="mt-[14px]">
+                                    <div class="flex items-center gap-[10px]">
+                                        <p class="font-semibold text-[14px] text-red-600">Chiều về:</p>
+                                        <div class="flex items-center gap-[2px]">
+                                            <img src="{baseUrl}{ret.flight.airline.logo}" class="w-[24px]" alt="{ret.flight.airline.name}">
+                                            <p class="text-[12px] text-gray-500">{ret.flight.airline.name}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-[20px]">
+                                        <div class="flex items-center gap-[4px]">
+                                            <img src="{customer_avatar}" class="w-[24px] h-[24px] object-cover rounded-[50%]" alt="{customer_name}">
+                                            <div>
+                                                <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                                <p class="font-semibold text-[12px] text-gray-900">{ret_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                            <p class="font-semibold text-[12px] text-gray-900">{ret_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        """
+
+                    def render_one_way_email(fd, booking, baseUrl, fe_url):
+                        first_leg, last_leg = get_flight_info(fd)
+
+                        if first_leg is None or last_leg is None:
+                            return (
+                                "<p>Chuyến bay của bạn chưa được cập nhật lộ trình.</p>"
+                            )
+
+                        return f"""
+                        <div style="font-family: Arial, sans-serif; color:#333; line-height:1.4; padding:20px;">
+                            <h2 style="color:#1a73e8;">Thanh toán thành công</h2>
+
+                            <p>Xin chào <strong>{booking.guest_info.full_name if booking.guest_info else booking.user.full_name}</strong>,</p>
+
+                            <p>Bạn đã thanh toán thành công cho <strong>chuyến bay một chiều</strong> của mình.</p>
+
+                            <div style="margin-top:20px; padding:15px; border:1px solid #e0e0e0; border-radius:8px;">
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <img src="{baseUrl}{fd.flight.airline.logo}"
+                                        alt="{fd.flight.airline.name}"
+                                        style="width:60px; height:60px; border-radius:8px; object-fit:cover;">
+                                    
+                                    <div>
+                                        <p style="margin:0; font-size:14px; color:#555;">Mã đặt chỗ</p>
+                                        <p style="margin:0; font-weight:bold; color:#1a73e8;">{booking.booking_code}</p>
+                                    </div>
+                                </div>
+
+                                <h3 style="margin-top:15px; font-size:16px;">
+                                    {first_leg.departure_airport.name} → {last_leg.arrival_airport.name}
+                                </h3>
+
+                                <table style="margin-top:10px; width:100%; font-size:14px;">
+                                    <tr>
+                                        <td><strong>Cất cánh:</strong></td>
+                                        <td>{first_leg.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Hạ cánh:</strong></td>
+                                        <td>{last_leg.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <p style="margin-top:20px;">Bạn có thể xem chi tiết tại trang hồ sơ của mình.</p>
+
+                            <a href="{fe_url}/profile/flight"
+                                style="display:inline-block; margin-top:10px; padding:10px 18px; background:#1a73e8; color:white; border-radius:6px; text-decoration:none;">
+                                Xem chi tiết chuyến bay
+                            </a>
+                        </div>
+                        """
+
+                    def render_round_trip_email(go, ret, booking, baseUrl, fe_url):
+                        go_first, go_last = get_flight_info(go)
+                        ret_first, ret_last = get_flight_info(ret)
+
+                        if None in (go_first, go_last, ret_first, ret_last):
+                            return "<p>Chuyến bay của bạn chưa được cập nhật đủ lộ trình.</p>"
+
+                        return f"""
+                        <div style="font-family: Arial, sans-serif; color:#333; line-height:1.4; padding:20px;">
+                            <h2 style="color:#1a73e8;">Thanh toán thành công</h2>
+
+                            <p>Xin chào <strong>{booking.guest_info.full_name if booking.guest_info else booking.user.full_name}</strong>,</p>
+
+                            <p>Bạn đã thanh toán thành công cho <strong>chuyến bay khứ hồi</strong> của mình.</p>
+
+                            <div style="margin-top:20px; padding:15px; border:1px solid #e0e0e0; border-radius:8px;">
+
+                                <!-- HEADER -->
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <img src="{baseUrl}{go.flight.airline.logo}"
+                                        alt="{go.flight.airline.name}"
+                                        style="width:60px; height:60px; border-radius:8px; object-fit:cover;">
+                                    
+                                    <div>
+                                        <p style="margin:0; font-size:14px; color:#555;">Mã đặt chỗ</p>
+                                        <p style="margin:0; font-weight:bold; color:#1a73e8;">{booking.booking_code}</p>
+                                    </div>
+                                </div>
+
+                                <h3 style="margin-top:15px; font-size:16px;">
+                                    {go_first.departure_airport.name} ↔ {go_last.arrival_airport.name}
+                                </h3>
+
+                                <!-- CHIỀU ĐI -->
+                                <h4 style="margin-top:12px; color:#1a73e8;">Chiều đi</h4>
+                                <table style="width:100%; font-size:14px;">
+                                    <tr>
+                                        <td><strong>Cất cánh:</strong></td>
+                                        <td>{go_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Hạ cánh:</strong></td>
+                                        <td>{go_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                </table>
+
+                                <!-- CHIỀU VỀ -->
+                                <h4 style="margin-top:20px; color:#d93025;">Chiều về</h4>
+                                <table style="width:100%; font-size:14px;">
+                                    <tr>
+                                        <td><strong>Cất cánh:</strong></td>
+                                        <td>{ret_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Hạ cánh:</strong></td>
+                                        <td>{ret_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                </table>
+
+                            </div>
+
+                            <p style="margin-top:20px;">Bạn có thể xem chi tiết tại trang hồ sơ của mình.</p>
+
+                            <a href="{fe_url}/profile/flight"
+                                style="display:inline-block; margin-top:10px; padding:10px 18px; background:#1a73e8; color:white; border-radius:6px; text-decoration:none;">
+                                Xem chi tiết chuyến bay
+                            </a>
+                        </div>
+                        """
+
+                    # Tạo message
+                    if len(flight_details) == 1:
+                        message = render_one_way(flight_details[0])
+                        message_admin = render_one_way_admin(
+                            flight_details[0], booking, baseUrl
+                        )
+                    else:
+                        message = render_round_trip(
+                            flight_details[0], flight_details[1]
+                        )
+                        message_admin = render_round_trip_admin(
+                            flight_details[0], flight_details[1], booking, baseUrl
+                        )
+
+                    # Tạo Notification và gửi email cho người dùng
+                    Notification.objects.create(
+                        user=booking.user if booking.user else None,
+                        email=email_to,
+                        title="Thanh toán thành công",
+                        message=message,
+                        message_email=(
+                            render_one_way_email(
+                                flight_details[0], booking, baseUrl, front_url
+                            )
+                            if len(flight_details) == 1
+                            else render_round_trip_email(
+                                flight_details[0],
+                                flight_details[1],
+                                booking,
+                                baseUrl,
+                                front_url,
+                            )
+                        ),
+                        link="/profile/flight",
+                        send_mail_flag=True,
+                    )
+
+                    for flight_detail in flight_details:
+                        # gửi thông báo cho người vận hành chuyến bay (không gửi email)
+                        Notification.objects.create(
+                            user=(
+                                flight_detail.flight.airline.flight_operations_staff
+                            ),  # user có thể null
+                            email=(
+                                flight_detail.flight.airline.flight_operations_staff.email
+                            ),
+                            title="Thanh toán thành công",
+                            message=render_one_way_admin(
+                                flight_detail, booking, baseUrl
+                            ),
+                            message_email="",
+                            link=f"/flight-payment",
+                            send_mail_flag=False,
+                        )
+
+                    # gửi thông báo cho tất cả admin (không gửi email)
+                    admins = CustomUser.objects.filter(
+                        role="admin"
+                    )  # sửa 'role' + 'admin' theo model của bạn
+                    for admin in admins:
+                        Notification.objects.create(
+                            user=admin,
+                            email=admin.email,
+                            title="Thanh toán thành công",
+                            message=message_admin,
+                            message_email="",
+                            link=f"/flight-payment",  # hoặc link phù hợp cho admin
+                            send_mail_flag=False,
+                        )
+
             return Response({"detail": "Payment completed successfully"})
         else:
             payment.status = PaymentStatus.FAILED
@@ -1129,6 +1593,260 @@ class PaymentViewSet(viewsets.ModelViewSet):
                         is_error=True,
                     )
 
+                elif booking.service_type == ServiceType.FLIGHT:
+                    flight_details = booking.flight_details.all()
+
+                    if not flight_details.exists():
+                        return
+
+                    # Hàm lấy leg đầu và cuối
+                    def get_flight_info(fd):
+                        flight = fd.flight
+                        first_leg = flight.legs.order_by("departure_time").first()
+                        last_leg = flight.legs.order_by("arrival_time").last()
+                        return first_leg, last_leg
+
+                    # Hàm render 1 chiều
+                    def render_one_way(fd):
+                        first_leg, last_leg = get_flight_info(fd)
+
+                        # Nếu không có legs → thông báo lỗi an toàn
+                        if first_leg is None or last_leg is None:
+                            return "<div>Chuyến bay chưa cập nhật lộ trình</div>"
+
+                        return f"""
+                        <div class="border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]">
+                        <div class="flex-shrink-0">
+                            <img src="{baseUrl}{fd.flight.airline.logo}" alt="{fd.flight.airline.name}" class="w-[50px] h-[50px] object-cover rounded-lg">
+                        </div>
+
+                        <div class="flex-grow">
+                            <div class="flex items-center gap-[6px] text-red-500 font-bold">
+                                <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 384 512" class="text-[20px]" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"></path>
+                                </svg>
+                                Thanh toán thất bại
+                            </div>
+                            <h3 class="text-gray-900 mb-[6px] leading-[18px]">
+                                <div>Mã:
+                                    <span class="text-blue-500 font-semibold"> {booking.booking_code}</span>
+                                </div>
+                                <span>Chuyến bay </span>
+                                <span class="font-bold text-yellow-600">một chiều</span>:
+                                <span class="font-bold">{first_leg.departure_airport.name}</span> →
+                                <span class="font-bold">{last_leg.arrival_airport.name}</span>
+                            </h3>
+
+                            <div class="flex gap-[20px]">
+                                <div>
+                                    <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                    <p class="font-semibold text-[12px] text-gray-900">{first_leg.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                    <p class="font-semibold text-[12px] text-gray-900">{last_leg.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                        """
+
+                    # Hàm render khứ hồi
+                    def render_round_trip(go, ret):
+                        go_first, go_last = get_flight_info(go)
+                        ret_first, ret_last = get_flight_info(ret)
+
+                        if None in (go_first, go_last, ret_first, ret_last):
+                            return "<div>Chuyến bay chưa cập nhật đủ lộ trình</div>"
+
+                        return f"""
+                        <div class="border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]">
+                            <div class="flex-shrink-0">
+                                <img src="{baseUrl}{go.flight.airline.logo}" alt="{go.flight.airline.name}" class="w-[50px] h-[50px] object-cover rounded-lg">
+                            </div>
+
+                            <div class="flex-grow">
+                                <div class="flex items-center gap-[6px] text-red-500 font-bold">
+                                    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 384 512" class="text-[20px]" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"></path>
+                                    </svg>
+                                    Thanh toán thất bại
+                                </div>
+                                <h3 class="text-gray-900 mb-[6px] leading-[18px]">
+                                    <div>Mã:
+                                        <span class="text-blue-500 font-semibold"> {booking.booking_code}</span>
+                                    </div>
+                                    <span>Chuyến bay </span>
+                                    <span class="font-bold text-green-600">khứ hồi</span>:
+                                    <span class="font-bold">{go_first.departure_airport.name}</span> →
+                                    <span class="font-bold">{go_last.arrival_airport.name}</span>
+                                </h3>
+
+                                <!-- CHIỀU ĐI -->
+                                <div>
+                                    <div class="flex items-center gap-[10px]">
+                                        <p class="font-semibold text-[14px] text-blue-600">Chiều đi:</p>
+                                        <div class="flex items-center gap-[2px]">
+                                        <img src="{baseUrl}{go.flight.airline.logo}" alt="{go.flight.airline.name}" class="w-[24px]">
+                                        <p class="text-[12px] text-gray-500">{go.flight.airline.name}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-[20px]">
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{go_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{go_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CHIỀU VỀ -->
+                                <div class="mt-[14px]">
+                                    <div class="flex items-center gap-[10px]">
+                                        <p class="font-semibold text-[14px] text-red-600">Chiều về:</p>
+                                        <div class="flex items-center gap-[2px]">
+                                        <img src="{baseUrl}{ret.flight.airline.logo}" alt="{ret.flight.airline.name}" class="w-[24px]">
+                                        <p class="text-[12px] text-gray-500">{ret.flight.airline.name}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-[20px]">
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{ret_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{ret_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        """
+
+                    def render_one_way_email(fd, booking, baseUrl):
+                        first_leg, last_leg = get_flight_info(fd)
+
+                        if first_leg is None or last_leg is None:
+                            return """
+                            <div style="font-family: Arial; font-size:14px;">
+                                Chuyến bay chưa cập nhật lộ trình.
+                            </div>
+                            """
+
+                        customer_name = (
+                            booking.guest_info.full_name
+                            if booking.guest_info
+                            else "Khách lẻ"
+                        )
+
+                        return f"""
+                        <div style="font-family: Arial; padding: 20px;">
+                            <h2 style="color:#d9534f;">Thanh toán thất bại</h2>
+                            <p>Xin chào <b>{customer_name}</b>,</p>
+                            <p>Rất tiếc! Giao dịch thanh toán cho chuyến bay của bạn đã <b style="color:#d9534f;">không thành công</b>.</p>
+
+                            <div style="border:1px solid #eee; padding:15px; border-radius:6px; margin-top:15px;">
+                                <h3 style="margin-top:0;">Thông tin chuyến bay (một chiều)</h3>
+
+                                <p><b>Mã đặt chỗ:</b> {booking.booking_code}</p>
+
+                                <p><b>Hãng bay:</b> {fd.flight.airline.name}</p>
+
+                                <p><b>Lộ trình:</b> {first_leg.departure_airport.name} → {last_leg.arrival_airport.name}</p>
+
+                                <p><b>Thời điểm cất cánh:</b> {first_leg.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                <p><b>Thời điểm hạ cánh:</b> {last_leg.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                            </div>
+
+                            <p style="margin-top:20px;">
+                                Vui lòng thử thanh toán lại hoặc chọn phương thức khác.
+                            </p>
+
+                            <p style="color:#777; font-size:12px;">Cảm ơn bạn đã sử dụng dịch vụ!</p>
+                        </div>
+                        """
+
+                    def render_round_trip_email(go, ret, booking, baseUrl):
+                        go_first, go_last = get_flight_info(go)
+                        ret_first, ret_last = get_flight_info(ret)
+
+                        customer_name = (
+                            booking.guest_info.full_name
+                            if booking.guest_info
+                            else "Khách lẻ"
+                        )
+
+                        if None in (go_first, go_last, ret_first, ret_last):
+                            return "<p>Chuyến bay của bạn chưa được cập nhật đủ lộ trình.</p>"
+
+                        return f"""
+                        <div style="font-family: Arial; padding: 20px;">
+                            <h2 style="color:#d9534f;">Thanh toán thất bại</h2>
+                            <p>Xin chào <b>{customer_name}</b>,</p>
+                            <p>Giao dịch thanh toán cho chuyến bay khứ hồi của bạn đã <b style="color:#d9534f;">không thành công</b>.</p>
+
+                            <div style="border:1px solid #eee; padding:15px; border-radius:6px; margin-top:15px;">
+                                <h3 style="margin-top:0;">Thông tin chuyến bay khứ hồi</h3>
+
+                                <p><b>Mã đặt chỗ:</b> {booking.booking_code}</p>
+
+                                <hr/>
+
+                                <h4>Chiều đi</h4>
+                                <p><b>Hãng bay:</b> {go.flight.airline.name}</p>
+                                <p><b>Lộ trình:</b> {go_first.departure_airport.name} → {go_last.arrival_airport.name}</p>
+                                <p><b>Cất cánh:</b> {go_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                <p><b>Hạ cánh:</b> {go_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+
+                                <hr/>
+
+                                <h4>Chiều về</h4>
+                                <p><b>Hãng bay:</b> {ret.flight.airline.name}</p>
+                                <p><b>Lộ trình:</b> {ret_first.departure_airport.name} → {ret_last.arrival_airport.name}</p>
+                                <p><b>Cất cánh:</b> {ret_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                <p><b>Hạ cánh:</b> {ret_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                            </div>
+
+                            <p style="margin-top:20px;">
+                                Bạn có thể thử thanh toán lại hoặc liên hệ hỗ trợ nếu cần.
+                            </p>
+
+                            <p style="color:#777; font-size:12px;">Cảm ơn bạn đã sử dụng dịch vụ!</p>
+                        </div>
+                        """
+
+                    # Tạo message
+                    if len(flight_details) == 1:
+                        message = render_one_way(flight_details[0])
+                    else:
+                        message = render_round_trip(
+                            flight_details[0], flight_details[1]
+                        )
+
+                    # Tạo Notification và gửi email cho người dùng
+                    Notification.objects.create(
+                        user=booking.user if booking.user else None,
+                        email=email_to,
+                        title="Thanh toán thất bại",
+                        message=message,
+                        message_email=(
+                            render_one_way_email(flight_details[0], booking, baseUrl)
+                            if len(flight_details) == 1
+                            else render_round_trip_email(
+                                flight_details[0], flight_details[1], booking, baseUrl
+                            )
+                        ),
+                        link="/profile/flight",
+                        send_mail_flag=True,
+                        is_error=True,
+                    )
+
             return Response({"detail": "Payment not completed"}, status=400)
 
     @action(detail=True, methods=["post"])
@@ -1485,6 +2203,282 @@ class PaymentViewSet(viewsets.ModelViewSet):
                     send_mail_flag=True,
                 )
 
+            elif booking.service_type == ServiceType.FLIGHT:
+                flight_details = booking.flight_details.all()
+
+                if not flight_details.exists():
+                    return
+
+                # Hàm lấy leg đầu và cuối
+                def get_flight_info(fd):
+                    flight = fd.flight
+                    first_leg = flight.legs.order_by("departure_time").first()
+                    last_leg = flight.legs.order_by("arrival_time").last()
+                    return first_leg, last_leg
+
+                # Hàm render 1 chiều
+                def render_one_way(fd):
+                    first_leg, last_leg = get_flight_info(fd)
+
+                    # Nếu không có legs → thông báo lỗi an toàn
+                    if first_leg is None or last_leg is None:
+                        return "<div>Chuyến bay chưa cập nhật lộ trình</div>"
+
+                    return f"""
+                        <div class="border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]">
+                        <div class="flex-shrink-0">
+                            <img src="{baseUrl}{fd.flight.airline.logo}" alt="{fd.flight.airline.name}" class="w-[50px] h-[50px] object-cover rounded-lg">
+                        </div>
+
+                        <div class="flex-grow">
+                            <h3 class="text-gray-900 mb-[6px] leading-[18px]">
+                                <div>Mã:
+                                    <span class="text-blue-500 font-semibold"> {booking.booking_code}</span>
+                                </div>
+                                <span>Chuyến bay </span>
+                                <span class="font-bold text-yellow-600">một chiều</span>:
+                                <span class="font-bold">{first_leg.departure_airport.name}</span> →
+                                <span class="font-bold">{last_leg.arrival_airport.name}</span>
+                            </h3>
+
+                            <div class="flex gap-[20px]">
+                                <div>
+                                    <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                    <p class="font-semibold text-[12px] text-gray-900">{first_leg.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                    <p class="font-semibold text-[12px] text-gray-900">{last_leg.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                        """
+
+                # Hàm render khứ hồi
+                def render_round_trip(go, ret):
+                    go_first, go_last = get_flight_info(go)
+                    ret_first, ret_last = get_flight_info(ret)
+
+                    if None in (go_first, go_last, ret_first, ret_last):
+                        return "<div>Chuyến bay chưa cập nhật đủ lộ trình</div>"
+
+                    return f"""
+                        <div class="border-t-[1px] border-[#f0f0f0] px-[10px] py-[10px] flex gap-[10px]">
+                            <div class="flex-shrink-0">
+                                <img src="{baseUrl}{go.flight.airline.logo}" alt="{go.flight.airline.name}" class="w-[50px] h-[50px] object-cover rounded-lg">
+                            </div>
+
+                            <div class="flex-grow">
+                                <h3 class="text-gray-900 mb-[6px] leading-[18px]">
+                                    <div>Mã:
+                                        <span class="text-blue-500 font-semibold"> {booking.booking_code}</span>
+                                    </div>
+                                    <span>Chuyến bay </span>
+                                    <span class="font-bold text-green-600">khứ hồi</span>:
+                                    <span class="font-bold">{go_first.departure_airport.name}</span> →
+                                    <span class="font-bold">{go_last.arrival_airport.name}</span>
+                                </h3>
+
+                                <!-- CHIỀU ĐI -->
+                                <div>
+                                    <div class="flex items-center gap-[10px]">
+                                        <p class="font-semibold text-[14px] text-blue-600">Chiều đi:</p>
+                                        <div class="flex items-center gap-[2px]">
+                                        <img src="{baseUrl}{go.flight.airline.logo}" alt="{go.flight.airline.name}" class="w-[24px]">
+                                        <p class="text-[12px] text-gray-500">{go.flight.airline.name}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-[20px]">
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{go_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{go_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CHIỀU VỀ -->
+                                <div class="mt-[14px]">
+                                    <div class="flex items-center gap-[10px]">
+                                        <p class="font-semibold text-[14px] text-red-600">Chiều về:</p>
+                                        <div class="flex items-center gap-[2px]">
+                                        <img src="{baseUrl}{ret.flight.airline.logo}" alt="{ret.flight.airline.name}" class="w-[24px]">
+                                        <p class="text-[12px] text-gray-500">{ret.flight.airline.name}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-[20px]">
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời điểm cất cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{ret_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                        <div>
+                                        <p class="text-gray-600 text-[12px]">Thời gian hạ cánh</p>
+                                        <p class="font-semibold text-[12px] text-gray-900">{ret_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        """
+
+                def render_one_way_email(fd, booking, baseUrl, fe_url):
+                    first_leg, last_leg = get_flight_info(fd)
+
+                    if first_leg is None or last_leg is None:
+                        return "<p>Chuyến bay của bạn chưa được cập nhật lộ trình.</p>"
+
+                    return f"""
+                        <div style="font-family: Arial, sans-serif; color:#333; line-height:1.4; padding:20px;">
+                            <h2 style="color:#1a73e8;">Thanh toán thành công</h2>
+
+                            <p>Xin chào <strong>{booking.guest_info.full_name if booking.guest_info else booking.user.full_name}</strong>,</p>
+
+                            <p>Bạn đã thanh toán thành công cho <strong>chuyến bay một chiều</strong> của mình.</p>
+
+                            <div style="margin-top:20px; padding:15px; border:1px solid #e0e0e0; border-radius:8px;">
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <img src="{baseUrl}{fd.flight.airline.logo}"
+                                        alt="{fd.flight.airline.name}"
+                                        style="width:60px; height:60px; border-radius:8px; object-fit:cover;">
+                                    
+                                    <div>
+                                        <p style="margin:0; font-size:14px; color:#555;">Mã đặt chỗ</p>
+                                        <p style="margin:0; font-weight:bold; color:#1a73e8;">{booking.booking_code}</p>
+                                    </div>
+                                </div>
+
+                                <h3 style="margin-top:15px; font-size:16px;">
+                                    {first_leg.departure_airport.name} → {last_leg.arrival_airport.name}
+                                </h3>
+
+                                <table style="margin-top:10px; width:100%; font-size:14px;">
+                                    <tr>
+                                        <td><strong>Cất cánh:</strong></td>
+                                        <td>{first_leg.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Hạ cánh:</strong></td>
+                                        <td>{last_leg.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <p style="margin-top:20px;">Bạn có thể xem chi tiết tại trang hồ sơ của mình.</p>
+
+                            <a href="{fe_url}/profile/flight"
+                                style="display:inline-block; margin-top:10px; padding:10px 18px; background:#1a73e8; color:white; border-radius:6px; text-decoration:none;">
+                                Xem chi tiết chuyến bay
+                            </a>
+                        </div>
+                        """
+
+                def render_round_trip_email(go, ret, booking, baseUrl, fe_url):
+                    go_first, go_last = get_flight_info(go)
+                    ret_first, ret_last = get_flight_info(ret)
+
+                    if None in (go_first, go_last, ret_first, ret_last):
+                        return (
+                            "<p>Chuyến bay của bạn chưa được cập nhật đủ lộ trình.</p>"
+                        )
+
+                    return f"""
+                        <div style="font-family: Arial, sans-serif; color:#333; line-height:1.4; padding:20px;">
+                            <h2 style="color:#1a73e8;">Thanh toán thành công</h2>
+
+                            <p>Xin chào <strong>{booking.guest_info.full_name if booking.guest_info else booking.user.full_name}</strong>,</p>
+
+                            <p>Bạn đã thanh toán thành công cho <strong>chuyến bay khứ hồi</strong> của mình.</p>
+
+                            <div style="margin-top:20px; padding:15px; border:1px solid #e0e0e0; border-radius:8px;">
+
+                                <!-- HEADER -->
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <img src="{baseUrl}{go.flight.airline.logo}"
+                                        alt="{go.flight.airline.name}"
+                                        style="width:60px; height:60px; border-radius:8px; object-fit:cover;">
+                                    
+                                    <div>
+                                        <p style="margin:0; font-size:14px; color:#555;">Mã đặt chỗ</p>
+                                        <p style="margin:0; font-weight:bold; color:#1a73e8;">{booking.booking_code}</p>
+                                    </div>
+                                </div>
+
+                                <h3 style="margin-top:15px; font-size:16px;">
+                                    {go_first.departure_airport.name} ↔ {go_last.arrival_airport.name}
+                                </h3>
+
+                                <!-- CHIỀU ĐI -->
+                                <h4 style="margin-top:12px; color:#1a73e8;">Chiều đi</h4>
+                                <table style="width:100%; font-size:14px;">
+                                    <tr>
+                                        <td><strong>Cất cánh:</strong></td>
+                                        <td>{go_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Hạ cánh:</strong></td>
+                                        <td>{go_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                </table>
+
+                                <!-- CHIỀU VỀ -->
+                                <h4 style="margin-top:20px; color:#d93025;">Chiều về</h4>
+                                <table style="width:100%; font-size:14px;">
+                                    <tr>
+                                        <td><strong>Cất cánh:</strong></td>
+                                        <td>{ret_first.departure_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Hạ cánh:</strong></td>
+                                        <td>{ret_last.arrival_time.strftime("%Y-%m-%d %H:%M:%S")}</td>
+                                    </tr>
+                                </table>
+
+                            </div>
+
+                            <p style="margin-top:20px;">Bạn có thể xem chi tiết tại trang hồ sơ của mình.</p>
+
+                            <a href="{fe_url}/profile/flight"
+                                style="display:inline-block; margin-top:10px; padding:10px 18px; background:#1a73e8; color:white; border-radius:6px; text-decoration:none;">
+                                Xem chi tiết chuyến bay
+                            </a>
+                        </div>
+                        """
+
+                # Tạo message
+                if len(flight_details) == 1:
+                    message = render_one_way(flight_details[0])
+                else:
+                    message = render_round_trip(flight_details[0], flight_details[1])
+
+                # Tạo Notification và gửi email cho người dùng
+                Notification.objects.create(
+                    user=booking.user if booking.user else None,
+                    email=email_to,
+                    title="Thanh toán thành công",
+                    message=message,
+                    message_email=(
+                        render_one_way_email(
+                            flight_details[0], booking, baseUrl, front_url
+                        )
+                        if len(flight_details) == 1
+                        else render_round_trip_email(
+                            flight_details[0],
+                            flight_details[1],
+                            booking,
+                            baseUrl,
+                            front_url,
+                        )
+                    ),
+                    link="/profile/flight",
+                    send_mail_flag=True,
+                )
+
         return Response({"success": True, "detail": message}, status=status.HTTP_200_OK)
 
 
@@ -1537,6 +2531,10 @@ class PaymentPagination(PageNumberPagination):
             "flight_operations_staff_id"
         )
         flight_id = request.query_params.get("flight_id")
+        min_flight_leg_departure = request.query_params.get("min_flight_leg_departure")
+        max_flight_leg_departure = request.query_params.get("max_flight_leg_departure")
+        min_flight_leg_arrival = request.query_params.get("min_flight_leg_arrival")
+        max_flight_leg_arrival = request.query_params.get("max_flight_leg_arrival")
 
         if booking__service_type:
             self.filters["booking__service_type"] = booking__service_type
@@ -1613,6 +2611,28 @@ class PaymentPagination(PageNumberPagination):
             self.filters["booking__service_type"] = ServiceType.FLIGHT
             self.filters["booking__flight_details__flight_id"] = flight_id
 
+        if min_flight_leg_departure:
+            self.filters["booking__service_type"] = ServiceType.FLIGHT
+            self.filters[
+                "booking__flight_details__flight__legs__departure_time__gte"
+            ] = min_flight_leg_departure
+
+        if max_flight_leg_departure:
+            self.filters["booking__service_type"] = ServiceType.FLIGHT
+            self.filters[
+                "booking__flight_details__flight__legs__departure_time__lte"
+            ] = max_flight_leg_departure
+
+        if min_flight_leg_arrival:
+            self.filters["booking__flight_details__flight__legs__arrival_time__gte"] = (
+                min_flight_leg_arrival
+            )
+
+        if max_flight_leg_arrival:
+            self.filters["booking__flight_details__flight__legs__arrival_time__lte"] = (
+                max_flight_leg_arrival
+            )
+
         for field, value in request.query_params.items():
             if field not in [
                 "current",
@@ -1635,6 +2655,10 @@ class PaymentPagination(PageNumberPagination):
                 "date_launch_activity",
                 "flight_operations_staff_id",
                 "flight_id",
+                "min_flight_leg_departure",
+                "max_flight_leg_departure",
+                "min_flight_leg_arrival",
+                "max_flight_leg_arrival",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
@@ -1655,7 +2679,56 @@ class PaymentPagination(PageNumberPagination):
         return self.page_size
 
     def get_paginated_response(self, data):
-        total_count = Payment.objects.filter(**self.filters).distinct().count()
+        qs = Payment.objects.filter(**self.filters).distinct()
+
+        # Nếu có lọc theo flight legs thì annotate Min/Max để đảm bảo ALL legs hợp lệ
+        min_flight_leg_departure = self.filters.pop(
+            "booking__flight_details__flight__legs__departure_time__gte", None
+        )
+        max_flight_leg_departure = self.filters.pop(
+            "booking__flight_details__flight__legs__departure_time__lte", None
+        )
+
+        if min_flight_leg_departure or max_flight_leg_departure:
+            qs = qs.annotate(
+                min_leg_departure=Min(
+                    "booking__flight_details__flight__legs__departure_time"
+                ),
+                max_leg_departure=Max(
+                    "booking__flight_details__flight__legs__departure_time"
+                ),
+            )
+
+            if min_flight_leg_departure:
+                qs = qs.filter(min_leg_departure__gte=min_flight_leg_departure)
+
+            if max_flight_leg_departure:
+                qs = qs.filter(max_leg_departure__lte=max_flight_leg_departure)
+
+        min_flight_leg_arrival = self.filters.pop(
+            "booking__flight_details__flight__legs__arrival_time__gte", None
+        )
+        max_flight_leg_arrival = self.filters.pop(
+            "booking__flight_details__flight__legs__arrival_time__lte", None
+        )
+
+        if min_flight_leg_arrival or max_flight_leg_arrival:
+            qs = qs.annotate(
+                min_leg_arrival=Min(
+                    "booking__flight_details__flight__legs__arrival_time"
+                ),
+                max_leg_arrival=Max(
+                    "booking__flight_details__flight__legs__arrival_time"
+                ),
+            )
+
+            if min_flight_leg_arrival:
+                qs = qs.filter(min_leg_arrival__gte=min_flight_leg_arrival)
+
+            if max_flight_leg_arrival:
+                qs = qs.filter(max_leg_arrival__lte=max_flight_leg_arrival)
+
+        total_count = qs.count()
         total_pages = math.ceil(total_count / self.page_size)
 
         self.filters.clear()
@@ -1819,6 +2892,52 @@ class PaymentListView(generics.ListAPIView):
                 booking__activity_date_detail__date_launch__date=date_launch_activity
             )
 
+        min_flight_leg_departure = filter_params.get("min_flight_leg_departure")
+        max_flight_leg_departure = filter_params.get("max_flight_leg_departure")
+
+        # annotate để lấy min / max departure_time của mỗi flight
+        if min_flight_leg_departure or max_flight_leg_departure:
+            queryset = queryset.annotate(
+                flight_leg_min_departure=Min(
+                    "booking__flight_details__flight__legs__departure_time"
+                ),
+                flight_leg_max_departure=Max(
+                    "booking__flight_details__flight__legs__departure_time"
+                ),
+            )
+
+            # 🔹 Lọc theo khoảng thời gian (từ - đến)
+            if min_flight_leg_departure:
+                queryset = queryset.filter(
+                    booking__flight_details__flight__legs__departure_time__gte=min_flight_leg_departure
+                )
+            if max_flight_leg_departure:
+                queryset = queryset.filter(
+                    booking__flight_details__flight__legs__departure_time__lte=max_flight_leg_departure
+                )
+
+        min_flight_leg_arrival = filter_params.get("min_flight_leg_arrival")
+        max_flight_leg_arrival = filter_params.get("max_flight_leg_arrival")
+
+        if min_flight_leg_arrival or max_flight_leg_arrival:
+            queryset = queryset.annotate(
+                flight_leg_min_arrival=Min(
+                    "booking__flight_details__flight__legs__arrival_time"
+                ),
+                flight_leg_max_arrival=Max(
+                    "booking__flight_details__flight__legs__arrival_time"
+                ),
+            )
+
+            if min_flight_leg_arrival:
+                queryset = queryset.filter(
+                    flight_leg_min_arrival__gte=min_flight_leg_arrival
+                )
+            if max_flight_leg_arrival:
+                queryset = queryset.filter(
+                    flight_leg_max_arrival__lte=max_flight_leg_arrival
+                )
+
         for field, value in filter_params.items():
             if field not in [
                 "pageSize",
@@ -1841,6 +2960,10 @@ class PaymentListView(generics.ListAPIView):
                 "flight_operations_staff_id",
                 "flight_id",
                 "date_launch_activity",
+                "min_flight_leg_departure",
+                "max_flight_leg_departure",
+                "min_flight_leg_arrival",
+                "max_flight_leg_arrival",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
