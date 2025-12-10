@@ -358,7 +358,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
                                     <div>
                                         <p class='text-gray-600 text-[12px]'>Thời gian ước lượng</p>
-                                        <p class='font-semibold text-[12px] text-gray-900'>{booking.car_detail.total_time_estimate} tiếng</p>
+                                        <p class='font-semibold text-[12px] text-gray-900'>{round(booking.car_detail.total_time_estimate, 1)} tiếng</p>
                                     </div>
                                 </div>
                             </div>
@@ -425,7 +425,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
                                             <p style="margin:10px 0 0;">
                                                 <strong>Thời gian ước lượng:</strong><br>
-                                                {booking.car_detail.total_time_estimate} tiếng
+                                                {round(booking.car_detail.total_time_estimate, 1)} tiếng
                                             </p>
 
                                             <hr style="margin:20px 0; border:none; border-top:1px solid #e5e7eb;">
@@ -485,7 +485,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
                                     <div>
                                         <p class='text-gray-600 text-[12px]'>Thời gian ước lượng</p>
-                                        <p class='font-semibold text-[12px] text-gray-900'>{booking.car_detail.total_time_estimate} tiếng</p>
+                                        <p class='font-semibold text-[12px] text-gray-900'>{round(booking.car_detail.total_time_estimate, 1)} tiếng</p>
                                     </div>
                                 </div>
                             </div>
@@ -523,7 +523,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
                                         <div>
                                             <p class='text-gray-600 text-[12px]'>Thời gian ước lượng</p>
-                                            <p class='font-semibold text-[12px] text-gray-900'>{booking.car_detail.total_time_estimate} tiếng</p>
+                                            <p class='font-semibold text-[12px] text-gray-900'>{round(booking.car_detail.total_time_estimate, 1)} tiếng</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1365,7 +1365,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                                     </div>
                                     <div>
                                         <p class='text-gray-600 text-[12px]'>Thời gian ước lượng</p>
-                                        <p class='font-semibold text-[12px] text-gray-900'>{booking.car_detail.total_time_estimate} tiếng</p>
+                                        <p class='font-semibold text-[12px] text-gray-900'>{round(booking.car_detail.total_time_estimate, 1)} tiếng</p>
                                     </div>
                                 </div>
                             </div>
@@ -1431,7 +1431,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
                                     <p style="margin:10px 0 0;">
                                     <strong>Thời gian ước lượng:</strong><br>
-                                    {booking.car_detail.total_time_estimate} tiếng
+                                    {round(booking.car_detail.total_time_estimate, 1)} tiếng
                                     </p>
 
                                     <hr style="margin:20px 0; border:none; border-top:1px solid #e5e7eb;">
@@ -1993,7 +1993,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
                                     <div>
                                         <p class='text-gray-600 text-[12px]'>Thời gian ước lượng</p>
-                                        <p class='font-semibold text-[12px] text-gray-900'>{booking.car_detail.total_time_estimate} tiếng</p>
+                                        <p class='font-semibold text-[12px] text-gray-900'>{round(booking.car_detail.total_time_estimate, 1)} tiếng</p>
                                     </div>
                                 </div>
                             </div>
@@ -2060,7 +2060,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
                                             <p style="margin:10px 0 0;">
                                                 <strong>Thời gian ước lượng:</strong><br>
-                                                {booking.car_detail.total_time_estimate} tiếng
+                                                {round(booking.car_detail.total_time_estimate, 1)} tiếng
                                             </p>
 
                                             <hr style="margin:20px 0; border:none; border-top:1px solid #e5e7eb;">
