@@ -13,7 +13,7 @@ from .serializers import (
     FlightGetListSerializer,
 )
 from rest_framework import status
-from django.db.models import Q
+from django.db.models import Q, Max, F, Min
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import generics
 
@@ -51,6 +51,9 @@ class FlightListView(generics.ListAPIView):
         filter_params = self.request.query_params
         query_filter = Q()
 
+        # ⭐ Leg cuối là leg có arrival_time lớn nhất
+        queryset = Flight.objects.annotate(last_arrival_time=Max("legs__arrival_time"))
+
         # Duyệt qua các tham số query để tạo bộ lọc cho mỗi trường
         for field, value in filter_params.items():
             if (
@@ -59,6 +62,11 @@ class FlightListView(generics.ListAPIView):
                 and field != "sort"
                 and field != "airline_id"
                 and field != "flight_operations_staff_id"
+                and field != "arrival_city_id"
+                and field != "min_flight_leg_departure"
+                and field != "max_flight_leg_departure"
+                and field != "min_flight_leg_arrival"
+                and field != "max_flight_leg_arrival"
             ):
                 query_filter &= Q(
                     **{f"{field}__icontains": value}
@@ -67,6 +75,45 @@ class FlightListView(generics.ListAPIView):
                 query_filter &= Q(**{f"{field}": value})
             if field == "flight_operations_staff_id":
                 query_filter &= Q(**{f"airline__flight_operations_staff_id": value})
+            if field == "arrival_city_id":
+                # ⭐ Lọc đúng leg cuối cùng
+                query_filter &= Q(
+                    legs__arrival_time=F("last_arrival_time"),
+                    legs__arrival_airport__city_id=value,
+                )
+
+        min_flight_leg_departure = filter_params.get("min_flight_leg_departure")
+        max_flight_leg_departure = filter_params.get("max_flight_leg_departure")
+
+        # annotate để lấy min / max departure_time của mỗi flight
+        if min_flight_leg_departure or max_flight_leg_departure:
+            # ⭐ Tất cả legs phải >= min
+            if min_flight_leg_departure:
+                queryset = queryset.exclude(
+                    legs__departure_time__lt=min_flight_leg_departure
+                )
+
+            # ⭐ Tất cả legs phải <= max
+            if max_flight_leg_departure:
+                queryset = queryset.exclude(
+                    legs__departure_time__gt=max_flight_leg_departure
+                )
+
+        min_flight_leg_arrival = filter_params.get("min_flight_leg_arrival")
+        max_flight_leg_arrival = filter_params.get("max_flight_leg_arrival")
+
+        if min_flight_leg_arrival or max_flight_leg_arrival:
+            # ⭐ Tất cả legs phải >= min
+            if min_flight_leg_arrival:
+                queryset = queryset.exclude(
+                    legs__arrival_time__lt=min_flight_leg_arrival
+                )
+
+            # ⭐ Tất cả legs phải <= max
+            if max_flight_leg_arrival:
+                queryset = queryset.exclude(
+                    legs__arrival_time__gt=max_flight_leg_arrival
+                )
 
         queryset = queryset.filter(query_filter)
 

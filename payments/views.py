@@ -2611,28 +2611,6 @@ class PaymentPagination(PageNumberPagination):
             self.filters["booking__service_type"] = ServiceType.FLIGHT
             self.filters["booking__flight_details__flight_id"] = flight_id
 
-        if min_flight_leg_departure:
-            self.filters["booking__service_type"] = ServiceType.FLIGHT
-            self.filters[
-                "booking__flight_details__flight__legs__departure_time__gte"
-            ] = min_flight_leg_departure
-
-        if max_flight_leg_departure:
-            self.filters["booking__service_type"] = ServiceType.FLIGHT
-            self.filters[
-                "booking__flight_details__flight__legs__departure_time__lte"
-            ] = max_flight_leg_departure
-
-        if min_flight_leg_arrival:
-            self.filters["booking__flight_details__flight__legs__arrival_time__gte"] = (
-                min_flight_leg_arrival
-            )
-
-        if max_flight_leg_arrival:
-            self.filters["booking__flight_details__flight__legs__arrival_time__lte"] = (
-                max_flight_leg_arrival
-            )
-
         for field, value in request.query_params.items():
             if field not in [
                 "current",
@@ -2681,52 +2659,39 @@ class PaymentPagination(PageNumberPagination):
     def get_paginated_response(self, data):
         qs = Payment.objects.filter(**self.filters).distinct()
 
-        # Nếu có lọc theo flight legs thì annotate Min/Max để đảm bảo ALL legs hợp lệ
-        min_flight_leg_departure = self.filters.pop(
-            "booking__flight_details__flight__legs__departure_time__gte", None
+        # --- Lọc ALL legs departure ---
+        min_flight_leg_departure = self.request.query_params.get(
+            "min_flight_leg_departure"
         )
-        max_flight_leg_departure = self.filters.pop(
-            "booking__flight_details__flight__legs__departure_time__lte", None
+        max_flight_leg_departure = self.request.query_params.get(
+            "max_flight_leg_departure"
         )
 
-        if min_flight_leg_departure or max_flight_leg_departure:
-            qs = qs.annotate(
-                min_leg_departure=Min(
-                    "booking__flight_details__flight__legs__departure_time"
-                ),
-                max_leg_departure=Max(
-                    "booking__flight_details__flight__legs__departure_time"
-                ),
+        if min_flight_leg_departure:
+            # Loại bỏ payment có leg nào < min
+            qs = qs.exclude(
+                booking__flight_details__flight__legs__departure_time__lt=min_flight_leg_departure
             )
 
-            if min_flight_leg_departure:
-                qs = qs.filter(min_leg_departure__gte=min_flight_leg_departure)
-
-            if max_flight_leg_departure:
-                qs = qs.filter(max_leg_departure__lte=max_flight_leg_departure)
-
-        min_flight_leg_arrival = self.filters.pop(
-            "booking__flight_details__flight__legs__arrival_time__gte", None
-        )
-        max_flight_leg_arrival = self.filters.pop(
-            "booking__flight_details__flight__legs__arrival_time__lte", None
-        )
-
-        if min_flight_leg_arrival or max_flight_leg_arrival:
-            qs = qs.annotate(
-                min_leg_arrival=Min(
-                    "booking__flight_details__flight__legs__arrival_time"
-                ),
-                max_leg_arrival=Max(
-                    "booking__flight_details__flight__legs__arrival_time"
-                ),
+        if max_flight_leg_departure:
+            # Loại bỏ payment có leg nào > max
+            qs = qs.exclude(
+                booking__flight_details__flight__legs__departure_time__gt=max_flight_leg_departure
             )
 
-            if min_flight_leg_arrival:
-                qs = qs.filter(min_leg_arrival__gte=min_flight_leg_arrival)
+        # --- Lọc ALL legs arrival ---
+        min_flight_leg_arrival = self.request.query_params.get("min_flight_leg_arrival")
+        max_flight_leg_arrival = self.request.query_params.get("max_flight_leg_arrival")
 
-            if max_flight_leg_arrival:
-                qs = qs.filter(max_leg_arrival__lte=max_flight_leg_arrival)
+        if min_flight_leg_arrival:
+            qs = qs.exclude(
+                booking__flight_details__flight__legs__arrival_time__lt=min_flight_leg_arrival
+            )
+
+        if max_flight_leg_arrival:
+            qs = qs.exclude(
+                booking__flight_details__flight__legs__arrival_time__gt=max_flight_leg_arrival
+            )
 
         total_count = qs.count()
         total_pages = math.ceil(total_count / self.page_size)
@@ -2897,45 +2862,28 @@ class PaymentListView(generics.ListAPIView):
 
         # annotate để lấy min / max departure_time của mỗi flight
         if min_flight_leg_departure or max_flight_leg_departure:
-            queryset = queryset.annotate(
-                flight_leg_min_departure=Min(
-                    "booking__flight_details__flight__legs__departure_time"
-                ),
-                flight_leg_max_departure=Max(
-                    "booking__flight_details__flight__legs__departure_time"
-                ),
-            )
-
-            # 🔹 Lọc theo khoảng thời gian (từ - đến)
             if min_flight_leg_departure:
-                queryset = queryset.filter(
-                    booking__flight_details__flight__legs__departure_time__gte=min_flight_leg_departure
+                queryset = queryset.exclude(
+                    booking__flight_details__flight__legs__departure_time__lt=min_flight_leg_departure
                 )
+
             if max_flight_leg_departure:
-                queryset = queryset.filter(
-                    booking__flight_details__flight__legs__departure_time__lte=max_flight_leg_departure
+                queryset = queryset.exclude(
+                    booking__flight_details__flight__legs__departure_time__gt=max_flight_leg_departure
                 )
 
         min_flight_leg_arrival = filter_params.get("min_flight_leg_arrival")
         max_flight_leg_arrival = filter_params.get("max_flight_leg_arrival")
 
         if min_flight_leg_arrival or max_flight_leg_arrival:
-            queryset = queryset.annotate(
-                flight_leg_min_arrival=Min(
-                    "booking__flight_details__flight__legs__arrival_time"
-                ),
-                flight_leg_max_arrival=Max(
-                    "booking__flight_details__flight__legs__arrival_time"
-                ),
-            )
-
             if min_flight_leg_arrival:
-                queryset = queryset.filter(
-                    flight_leg_min_arrival__gte=min_flight_leg_arrival
+                queryset = queryset.exclude(
+                    booking__flight_details__flight__legs__arrival_time__lt=min_flight_leg_arrival
                 )
+
             if max_flight_leg_arrival:
-                queryset = queryset.filter(
-                    flight_leg_max_arrival__lte=max_flight_leg_arrival
+                queryset = queryset.exclude(
+                    booking__flight_details__flight__legs__arrival_time__gt=max_flight_leg_arrival
                 )
 
         for field, value in filter_params.items():
