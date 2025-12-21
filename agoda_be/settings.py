@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "activities",
     "airlines",
     "flights",
+    "locations",
     "channels",
     "chats",
     "drf_spectacular",
@@ -129,9 +130,9 @@ WSGI_APPLICATION = "agoda_be.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "agoda4",  # Tên cơ sở dữ liệu MySQL
+        "NAME": "agoda3",  # Tên cơ sở dữ liệu MySQL
         "USER": "root",  # Tên người dùng MySQL
-        "PASSWORD": "",  # Mật khẩu người dùng MySQL
+        "PASSWORD": "123456",  # Mật khẩu người dùng MySQL
         "HOST": "localhost",
         "PORT": "3306",
         "OPTIONS": {

@@ -3,6 +3,8 @@ from .models import Room, RoomImage, RoomBookingDetail, RoomAmenity
 from hotels.serializers import HotelCreateSerializer, HotelSimpleSerializer
 from accounts.serializers import UserSerializer
 from hotels.models import Hotel
+from django.utils import timezone
+from datetime import timedelta
 
 
 class RoomImageSerializer(serializers.ModelSerializer):
@@ -49,6 +51,11 @@ class RoomCreateSerializer(serializers.ModelSerializer):
         return obj.get_active_promotion() is not None
 
     def create(self, validated_data):
+        if 'start_date' not in validated_data or validated_data['start_date'] is None:
+            validated_data['start_date'] = timezone.now().date()
+        if 'end_date' not in validated_data or validated_data['end_date'] is None:
+            validated_data['end_date'] = timezone.now().date() + timedelta(days=365)
+        
         amenities_data = validated_data.pop("amenities_data", [])
         room = Room.objects.create(**validated_data)
 
