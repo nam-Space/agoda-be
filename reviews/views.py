@@ -240,6 +240,20 @@ class ReviewCreateView(generics.CreateAPIView):
                 # Cập nhật điểm trọng số cá nhân
                 interaction.update_weighted_score()
                 interaction.save()
+
+                best_review = (
+                    Review.objects.filter(
+                        service_type=ServiceType.HOTEL,
+                        service_ref_id=hotel.id,
+                        sentiment="positive",
+                    )
+                    .order_by("-rating", "-confidence")
+                    .first()
+                )
+
+                # Gán best_comment
+                hotel.best_comment = best_review.comment if best_review else None
+                hotel.save(update_fields=["best_comment"])
         elif service_type == ServiceType.ACTIVITY:
             activity = update_service_stats(Activity, ServiceType.ACTIVITY)
 

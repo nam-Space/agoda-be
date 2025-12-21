@@ -1,7 +1,7 @@
 from rest_framework.pagination import PageNumberPagination
 from rest_framework import generics
 from .models import Airline, Aircraft
-from .serializers import AirlineSerializer, AircraftSerializer
+from .serializers import AirlineSerializer, AircraftSerializer, AirlineCreateSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Q
@@ -36,6 +36,13 @@ class AirlineListView(generics.ListCreateAPIView):
     permission_classes = []
     pagination_class = CommonPagination
 
+    def get_serializer_class(self):
+        # POST → dùng serializer khác
+        if self.request.method == "POST":
+            return AirlineCreateSerializer
+        # GET → serializer mặc định
+        return AirlineSerializer
+
     def get_queryset(self):
         queryset = Airline.objects.all().order_by("-id")
         filter_params = self.request.query_params
@@ -49,10 +56,14 @@ class AirlineListView(generics.ListCreateAPIView):
                 and field != "page"
                 and field != "page_size"
                 and field != "sort"
+                and field != "flight_operations_staff_id"
             ):
                 query_filter &= Q(
                     **{f"{field}__icontains": value}
                 )  # Thêm điều kiện lọc cho mỗi trường
+
+            if field == "flight_operations_staff_id":
+                query_filter &= Q(**{f"{field}": value})
 
         queryset = queryset.filter(query_filter)
 
@@ -122,6 +133,13 @@ class AirlineDetailView(generics.RetrieveUpdateDestroyAPIView):
     authentication_classes = []
     permission_classes = []
 
+    def get_serializer_class(self):
+        # PUT / PATCH / DELETE → dùng AirlineCreateSerializer
+        if self.request.method in ["PUT", "PATCH", "DELETE"]:
+            return AirlineCreateSerializer
+        # GET → dùng AirlineSerializer
+        return AirlineSerializer
+
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
@@ -180,6 +198,12 @@ class AircraftListView(generics.ListCreateAPIView):
         airline_id = filter_params.get("airline_id")
         if airline_id:
             queryset = queryset.filter(airline_id=airline_id)
+
+        flight_operations_staff_id = filter_params.get("flight_operations_staff_id")
+        if flight_operations_staff_id:
+            queryset = queryset.filter(
+                airline__flight_operations_staff_id=flight_operations_staff_id
+            )
 
         sort_params = filter_params.get("sort")
         order_fields = []

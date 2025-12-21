@@ -71,7 +71,7 @@ class RoomAmenitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RoomAmenity
-        fields = ["id", "name", "room"]
+        fields = "__all__"
 
 
 class RoomAmenityCreateSerializer(serializers.ModelSerializer):
@@ -79,7 +79,7 @@ class RoomAmenityCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RoomAmenity
-        fields = ["id", "name", "room"]
+        fields = "__all__"
 
 
 class RoomBookingDetailSerializer(serializers.ModelSerializer):

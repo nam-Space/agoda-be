@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
 from hotels.models import Hotel
+from airlines.models import Airline
 
 
 # Serializer cho việc đăng ký người dùng mới
@@ -43,6 +44,9 @@ class CreateUserSerializer(serializers.ModelSerializer):
     manager = serializers.PrimaryKeyRelatedField(
         queryset=get_user_model().objects.all(), required=False, allow_null=True
     )
+    flight_operation_manager = serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.all(), required=False, allow_null=True
+    )
 
     class Meta:
         model = get_user_model()
@@ -58,12 +62,14 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "role",
             "avatar",
             "manager",
+            "flight_operation_manager",
         ]
         extra_kwargs = {
             "password": {"write_only": True},
             "birthday": {"required": False},
             "avatar": {"required": False},
             "manager": {"required": False},
+            "flight_operation_manager": {"required": False},
         }
 
     def create(self, validated_data):
@@ -127,8 +133,17 @@ class UserSimpleSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     # hotel = serializers.SerializerMethodField()
     hotel = serializers.SerializerMethodField()
-    manager = UserSimpleSerializer(read_only=True)  # quản lý
-    staffs = UserStaffSimpleSerializer(many=True, read_only=True)  # nhân viên
+    manager = UserSimpleSerializer(read_only=True)  # quản lý khách sạn
+    hotel_staffs = UserStaffSimpleSerializer(
+        many=True, read_only=True
+    )  # nhân viên khách sạn
+    airline = serializers.SerializerMethodField()
+    flight_operation_manager = UserSimpleSerializer(
+        read_only=True
+    )  # nhân viên vận hành chuyến bay
+    flight_staffs = UserStaffSimpleSerializer(
+        many=True, read_only=True
+    )  # nhân viên bán vé máy bay
 
     class Meta:
         model = get_user_model()
@@ -147,7 +162,10 @@ class UserSerializer(serializers.ModelSerializer):
             "date_joined",
             "hotel",
             "manager",  # 🆕 thêm trường quản lý
-            "staffs",  # 🆕 thêm danh sách nhân viên
+            "hotel_staffs",  # 🆕 thêm danh sách nhân viên
+            "airline",
+            "flight_operation_manager",
+            "flight_staffs",
         ]
         extra_kwargs = {"birthday": {"required": False}}
 
@@ -159,6 +177,14 @@ class UserSerializer(serializers.ModelSerializer):
             return HotelSimpleSerializer(obj.hotel).data
         return None
 
+    def get_airline(self, obj):
+        # import lazy để tránh circular import
+        from airlines.serializers import AirlineSimpleSerializer
+
+        if hasattr(obj, "airline") and obj.airline:
+            return AirlineSimpleSerializer(obj.airline).data
+        return None
+
 
 # Serializer cho thông tin người dùng (có mật khẩu)
 class UserAndPasswordSerializer(serializers.ModelSerializer):
@@ -168,6 +194,12 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
     )
     hotel = serializers.PrimaryKeyRelatedField(
         queryset=Hotel.objects.all(), required=False, allow_null=True
+    )
+    flight_operation_manager = serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.all(), required=False, allow_null=True
+    )
+    airline = serializers.PrimaryKeyRelatedField(
+        queryset=Airline.objects.all(), required=False, allow_null=True
     )
 
     class Meta:
@@ -188,11 +220,15 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
             "password",
             "manager",
             "hotel",
+            "flight_operation_manager",
+            "airline",
         ]
         extra_kwargs = {
             "birthday": {"required": False},
             "manager": {"required": False},
             "hotel": {"required": False},
+            "flight_operation_manager": {"required": False},
+            "airline": {"required": False},
         }
 
     def update(self, instance, validated_data):

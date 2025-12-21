@@ -122,9 +122,19 @@ class FlightGetListSerializer(serializers.ModelSerializer):
     seat_classes = SeatClassPricingSerializer(many=True, read_only=True)
     legs = FlightLegSerializer(many=True, read_only=True)
 
+    # Promotion
+    promotion = serializers.SerializerMethodField()
+    has_promotion = serializers.SerializerMethodField()
+
     class Meta:
         model = Flight
         fields = "__all__"
+
+    def get_promotion(self, obj):
+        return obj.get_active_promotion()
+
+    def get_has_promotion(self, obj):
+        return obj.get_active_promotion() is not None
 
 
 class FlightLegGetListSerializer(serializers.ModelSerializer):

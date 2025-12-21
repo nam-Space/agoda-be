@@ -2,6 +2,7 @@
 from django.urls import path
 from .views import (
     RoomListView,
+    RoomAdminListView,
     RoomCreateView,
     RoomDetailView,
     RoomUpdateView,
@@ -18,6 +19,7 @@ from .views import (
 
 urlpatterns = [
     path("rooms/", RoomListView.as_view(), name="room-list"),
+    path("rooms-admin/", RoomAdminListView.as_view(), name="room-admin-list"),
     path("rooms/create/", RoomCreateView.as_view(), name="room-create"),
     path("rooms/<int:pk>/", RoomDetailView.as_view(), name="room-detail"),
     path("rooms/<int:pk>/update/", RoomUpdateView.as_view(), name="room-update"),

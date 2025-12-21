@@ -17,10 +17,13 @@ class CustomUser(AbstractUser):
     ROLE_CHOICES = [
         ("customer", "Customer"),
         ("admin", "Admin"),
-        ("staff", "Staff"),
+        ("hotel_staff", "Hotel Staff"),
         ("driver", "Driver"),
         ("owner", "Owner"),
         ("event_organizer", "Event Organizer"),
+        ("marketing_manager", "Marketing Manager"),
+        ("flight_operations_staff", "Flight Operations Staff"),
+        ("airline_ticketing_staff", "Airline Ticketing Staff"),
     ]
     role = models.CharField(max_length=255, choices=ROLE_CHOICES, default="customer")
     birthday = models.DateField(null=True, blank=True)
@@ -29,14 +32,28 @@ class CustomUser(AbstractUser):
     manager = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
-        related_name="staffs",
+        related_name="hotel_staffs",
         null=True,
         blank=True,
     )
     hotel = models.ForeignKey(
         "hotels.Hotel",
         on_delete=models.SET_NULL,
-        related_name="staffs",
+        related_name="hotel_staffs",
+        null=True,
+        blank=True,
+    )
+    flight_operation_manager = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="flight_staffs",
+        null=True,
+        blank=True,
+    )
+    airline = models.ForeignKey(
+        "airlines.Airline",
+        on_delete=models.SET_NULL,
+        related_name="flight_staffs",
         null=True,
         blank=True,
     )

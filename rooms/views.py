@@ -54,6 +54,7 @@ class RoomListView(generics.ListAPIView):
         queryset = Room.objects.all()
         filter_params = self.request.query_params
         hotel_id = filter_params.get("hotel_id")
+        owner_id = filter_params.get("owner_id")
         hotel_name = filter_params.get("hotel_name")
         adults = filter_params.get("adults")
         children = filter_params.get("children")
@@ -63,6 +64,9 @@ class RoomListView(generics.ListAPIView):
         try:
             if hotel_id:
                 queryset = queryset.filter(hotel_id=int(hotel_id))
+
+            if owner_id:
+                queryset = queryset.filter(hotel__owner_id=int(owner_id))
 
             if hotel_name:
                 queryset = queryset.filter(hotel__name__icontains=hotel_name)
@@ -110,6 +114,77 @@ class RoomListView(generics.ListAPIView):
         except Exception as e:
             print("get_queryset error:", e)
             return Room.objects.none()
+
+        queryset = queryset.prefetch_related(
+            Prefetch("images", queryset=RoomImage.objects.all(), to_attr="room_images")
+        )
+        sort_params = filter_params.get("sort")
+        order_fields = []
+
+        if sort_params:
+            # Ví dụ: sort=avg_price-desc,avg_star-asc
+            sort_list = sort_params.split(",")
+            for sort_item in sort_list:
+                try:
+                    field, direction = sort_item.split("-")
+                    if direction == "desc":
+                        order_fields.append(f"-{field}")
+                    else:
+                        order_fields.append(field)
+                except ValueError:
+                    continue  # bỏ qua format không hợp lệ
+
+        queryset = queryset.order_by(*order_fields)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            # Truyền message vào context để phân trang trả về đúng message
+            self.paginator.context = {"message": "Fetched all rooms successfully!"}
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched all rooms successfully!",
+                "meta": {"totalItems": queryset.count(), "pagination": None},
+                "data": serializer.data,
+            }
+        )
+
+
+class RoomAdminListView(generics.ListAPIView):
+    serializer_class = RoomSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = []
+    pagination_class = CommonPagination
+
+    def get_queryset(self):
+        queryset = Room.objects.all()
+        filter_params = self.request.query_params
+        hotel_id = filter_params.get("hotel_id")
+        owner_id = filter_params.get("owner_id")
+        hotel_name = filter_params.get("hotel_name")
+        adults = filter_params.get("adults")
+        children = filter_params.get("children")
+
+        if hotel_id:
+            queryset = queryset.filter(hotel_id=int(hotel_id))
+
+        if owner_id:
+            queryset = queryset.filter(hotel__owner_id=int(owner_id))
+
+        if hotel_name:
+            queryset = queryset.filter(hotel__name__icontains=hotel_name)
+
+        if adults:
+            queryset = queryset.filter(adults_capacity__gte=int(adults))
+
+        if children:
+            queryset = queryset.filter(children_capacity__gte=int(children))
 
         queryset = queryset.prefetch_related(
             Prefetch("images", queryset=RoomImage.objects.all(), to_attr="room_images")
