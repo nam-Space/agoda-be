@@ -6,10 +6,18 @@ from accounts.models import CustomUser
 
 class CarSerializer(serializers.ModelSerializer):
     user = UserSerializer()  # tài xế
+    promotion = serializers.SerializerMethodField()
+    has_promotion = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
         fields = "__all__"
+
+    def get_promotion(self, obj):
+        return obj.get_active_promotion()
+
+    def get_has_promotion(self, obj):
+        return obj.get_active_promotion() is not None
 
 
 class CarCreateSerializer(serializers.ModelSerializer):
@@ -36,7 +44,9 @@ class CarBookingDetailSerializer(serializers.ModelSerializer):
     car = CarSerializer()
     driver = UserSerializer(read_only=True)
 
-    total_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_price = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
     discount_amount = serializers.FloatField(read_only=True)
     final_price = serializers.FloatField(read_only=True)
 
