@@ -60,6 +60,7 @@ class RoomListView(generics.ListAPIView):
         children = filter_params.get("children")
         start_date = filter_params.get("start_date")
         end_date = filter_params.get("end_date")
+        stay_type = filter_params.get("stay_type")
 
         try:
             if hotel_id:
@@ -76,6 +77,9 @@ class RoomListView(generics.ListAPIView):
 
             if children:
                 queryset = queryset.filter(children_capacity__gte=int(children))
+
+            if stay_type:
+                queryset = queryset.filter(stay_type=stay_type)
 
             # Chỉ lấy phòng có còn ít nhất 1 phòng trống
             queryset = queryset.filter(available_rooms__gt=0)
