@@ -40,6 +40,7 @@ urlpatterns = [
     path("api/payments/", include("payments.urls")),
     path("api/airlines/", include("airlines.urls")),
     path("api/flights/", include("flights.urls")),
+    path("api/locations/", include("locations.urls")),
     path("api/notifications/", include("notifications.urls")),
     path("api/bookings/", include("bookings.urls")),
     path("api/chats/", include("chats.urls")),

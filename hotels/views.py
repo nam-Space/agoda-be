@@ -55,6 +55,12 @@ class HotelPagination(PageNumberPagination):
                 "min_avg_price",
                 "max_avg_price",
                 "sort",
+                "stay_type",
+                "adult",
+                "child",
+                "room",
+                "startDate",
+                "endDate",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
@@ -142,6 +148,55 @@ class HotelListView(generics.ListAPIView):
             except ValueError:
                 return Hotel.objects.none()
 
+        # ---- stay_type filter ----
+        stay_type = params.get("stay_type")
+        if stay_type:
+            queryset = queryset.filter(rooms__stay_type=stay_type).distinct()
+
+        # ---- capacity filters ----
+        adult = params.get("adult")
+        if adult:
+            try:
+                adult = int(adult)
+                queryset = queryset.filter(rooms__adults_capacity__gte=adult).distinct()
+            except ValueError:
+                pass
+
+        child = params.get("child")
+        if child:
+            try:
+                child = int(child)
+                queryset = queryset.filter(rooms__children_capacity__gte=child).distinct()
+            except ValueError:
+                pass
+
+        room = params.get("room")
+        if room:
+            try:
+                room = int(room)
+                # Filter hotels có tổng available_rooms >= room (cho tất cả rooms hoặc tổng)
+                # Giả sử tổng available_rooms của hotel >= room
+                queryset = queryset.annotate(total_available=Sum('rooms__available_rooms')).filter(total_available__gte=room)
+            except ValueError:
+                pass
+
+        # ---- date filters ----
+        startDate = params.get("startDate")
+        endDate = params.get("endDate")
+        if startDate and endDate:
+            try:
+                from datetime import datetime
+                sd = datetime.strptime(startDate, "%Y-%m-%d").date()
+                ed = datetime.strptime(endDate, "%Y-%m-%d").date()
+                if sd <= ed:
+                    # Filter hotels có rooms available trong khoảng ngày
+                    queryset = queryset.filter(
+                        rooms__start_date__lte=sd,
+                        rooms__end_date__gte=ed
+                    ).distinct()
+            except ValueError:
+                pass
+
         owner = params.get("ownerId")
         if owner:
             try:
@@ -163,6 +218,12 @@ class HotelListView(generics.ListAPIView):
                 "min_avg_price",
                 "max_avg_price",
                 "sort",
+                "stay_type",
+                "adult",
+                "child",
+                "room",
+                "startDate",
+                "endDate",
             ]:
                 if field in [f.name for f in Hotel._meta.get_fields()]:
                     q_filter &= Q(**{f"{field}__icontains": value})

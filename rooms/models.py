@@ -3,6 +3,7 @@ from hotels.models import Hotel
 from django.utils import timezone
 from bookings.models import Booking
 from accounts.models import CustomUser
+from datetime import timedelta
 
 
 # Create your models here.
@@ -12,6 +13,9 @@ class Room(models.Model):
     )
     room_type = models.CharField(max_length=100)
     price_per_night = models.FloatField(default=0.0)
+    stay_type = models.CharField(max_length=50, choices=[('overnight', 'Overnight'), ('dayuse', 'Day Use')], default='overnight')
+    price_per_day = models.FloatField(default=0.0)  # For day use
+    dayuse_duration_hours = models.PositiveIntegerField(default=0)  # Hours for day use
     # capacity = models.IntegerField()
 
     # Capacity chia thành adults và children
@@ -155,21 +159,25 @@ class RoomBookingDetail(models.Model):
         if self.room and self.room.hotel and not self.owner_hotel:
             self.owner_hotel = self.room.hotel.owner
 
-        # Tính tổng tiền phòng (total_price) = price_per_night * số đêm * số lượng phòng
+        # Tính tổng tiền phòng dựa trên stay_type
         if self.room and self.check_in and self.check_out:
-            # Luôn convert về date để tính số đêm
-            check_in = self.check_in
-            check_out = self.check_out
-            if hasattr(check_in, "date"):
-                check_in = check_in.date()
-            if hasattr(check_out, "date"):
-                check_out = check_out.date()
-            num_nights = (check_out - check_in).days
-            if num_nights < 1:
-                num_nights = 1
-            self.total_price = (
-                float(self.room.price_per_night) * num_nights * self.room_count
-            )
+            if self.room.stay_type == 'dayuse':
+                # Cho dayuse, dùng price_per_day, và có lẽ num_days = 1
+                self.total_price = float(self.room.price_per_day) * self.room_count
+            else:
+                # Overnight: price_per_night * num_nights
+                check_in = self.check_in
+                check_out = self.check_out
+                if hasattr(check_in, "date"):
+                    check_in = check_in.date()
+                if hasattr(check_out, "date"):
+                    check_out = check_out.date()
+                num_nights = (check_out - check_in).days
+                if num_nights < 1:
+                    num_nights = 1
+                self.total_price = (
+                    float(self.room.price_per_night) * num_nights * self.room_count
+                )
         else:
             self.total_price = 0
 

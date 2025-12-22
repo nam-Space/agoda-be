@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "activities",
     "airlines",
     "flights",
+    "locations",
     "chats",
     "neighborhood",
     "quick_info",
