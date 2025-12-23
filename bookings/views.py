@@ -4,7 +4,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from .models import Booking, RefundPolicy
-from .serializers import BookingSerializer, RefundPolicySerializer, RefundPolicySerializer
+from .serializers import (
+    BookingSerializer,
+    RefundPolicySerializer,
+    RefundPolicySerializer,
+)
 from django.db.models import Q
 from rooms.serializers import (
     RoomBookingDetailSerializer,
@@ -36,25 +40,29 @@ from datetime import datetime, timedelta
 import stripe
 from django.conf import settings
 
+
 # Phân trang chung cho Booking và RefundPolicy
 class BookingCommonPagination(PageNumberPagination):
     page_size = 10
-    page_query_param = 'current'         
-    page_size_query_param = 'pageSize'   
+    page_query_param = "current"
+    page_size_query_param = "pageSize"
     max_page_size = 100
 
     def get_paginated_response(self, data):
-        return Response({
-            "isSuccess": True,
-            "message": self.context.get('message', "Fetched data successfully!"),
-            "meta": {
-                "totalItems": self.page.paginator.count,
-                "currentPage": self.page.number,
-                "itemsPerPage": self.get_page_size(self.request),
-                "totalPages": self.page.paginator.num_pages,
-            },
-            "data": data,
-        })
+        return Response(
+            {
+                "isSuccess": True,
+                "message": self.context.get("message", "Fetched data successfully!"),
+                "meta": {
+                    "totalItems": self.page.paginator.count,
+                    "currentPage": self.page.number,
+                    "itemsPerPage": self.get_page_size(self.request),
+                    "totalPages": self.page.paginator.num_pages,
+                },
+                "data": data,
+            }
+        )
+
 
 class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all()
@@ -82,18 +90,17 @@ class BookingViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            self.paginator.context = {'message': "Fetched all bookings successfully!"}
+            self.paginator.context = {"message": "Fetched all bookings successfully!"}
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            "isSuccess": True,
-            "message": "Fetched all bookings successfully!",
-            "meta": {
-                "totalItems": queryset.count(),
-                "pagination": None
-            },
-            "data": serializer.data,
-        })
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched all bookings successfully!",
+                "meta": {"totalItems": queryset.count(), "pagination": None},
+                "data": serializer.data,
+            }
+        )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -106,7 +113,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         if service_type == ServiceType.HOTEL:
             room_data = request.data.get("room_details")
             if room_data:
-                room_serializer = RoomBookingDetailCreateSerializer(data=room_data, many=isinstance(room_data, list))
+                room_serializer = RoomBookingDetailCreateSerializer(
+                    data=room_data, many=isinstance(room_data, list)
+                )
                 room_serializer.is_valid(raise_exception=True)
                 if isinstance(room_data, list):
                     details = room_serializer.save(booking=booking)
@@ -121,7 +130,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         elif service_type == ServiceType.CAR:
             car_data = request.data.get("car_detail")
             if car_data:
-                car_serializer = CarBookingDetailCreateSerializer(data=car_data, many=isinstance(car_data, list))
+                car_serializer = CarBookingDetailCreateSerializer(
+                    data=car_data, many=isinstance(car_data, list)
+                )
                 car_serializer.is_valid(raise_exception=True)
                 if isinstance(car_data, list):
                     details = car_serializer.save(booking=booking)
@@ -136,7 +147,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         elif service_type == ServiceType.FLIGHT:
             flight_data = request.data.get("flight_detail")
             if flight_data:
-                flight_serializer = FlightBookingDetailCreateSerializer(data=flight_data, many=isinstance(flight_data, list))
+                flight_serializer = FlightBookingDetailCreateSerializer(
+                    data=flight_data, many=isinstance(flight_data, list)
+                )
                 flight_serializer.is_valid(raise_exception=True)
                 if isinstance(flight_data, list):
                     details = flight_serializer.save(booking=booking)
@@ -147,7 +160,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                     booking.service_ref_ids = [detail.id]
                     data = FlightBookingDetailSerializer(detail).data
                 booking.save(update_fields=["service_ref_ids"])
-        
+
         elif service_type == ServiceType.ACTIVITY:
             activity_date_data = request.data.get("activity_date_detail")
             if activity_date_data:
@@ -179,12 +192,14 @@ class BookingViewSet(viewsets.ModelViewSet):
     def ensure_datetime(self, dt):
         """Chuyển date hoặc datetime về datetime object"""
         from datetime import time
+
         if dt is None:
             return None
         if isinstance(dt, datetime):
             return dt
         # Nếu là date object, convert sang datetime với time min
         from datetime import date
+
         if isinstance(dt, date):
             return datetime.combine(dt, time.min)
         return dt
@@ -196,48 +211,52 @@ class BookingViewSet(viewsets.ModelViewSet):
         """Tính toán số tiền hoàn lại dựa trên policy, promotion và thời gian"""
         # Lấy policy cho service type
         try:
-            policy = RefundPolicy.objects.filter(
-                service_type=booking.service_type,
-                is_active=True
-            ).order_by('-hours_before_start').first()
+            policy = (
+                RefundPolicy.objects.filter(
+                    service_type=booking.service_type, is_active=True
+                )
+                .order_by("-hours_before_start")
+                .first()
+            )
         except RefundPolicy.DoesNotExist:
             policy = None
-        
+
         if not policy:
             # Nếu không có policy, mặc định hoàn 100%
             return booking.final_price
-        
+
         # Lấy thời gian bắt đầu
         start_time = self.get_start_time_for_booking(booking)
         if not start_time:
             # Nếu không lấy được thời gian, hoàn 100%
             return booking.final_price
-        
+
         # Tính số giờ trước khi bắt đầu
         # Đảm bảo start_time là datetime object
         start_time = self.ensure_datetime(start_time)
         if not start_time:
             return booking.final_price
-        
+
         # Lấy timezone từ start_time nếu có, nếu không dùng timezone naive
         try:
-            if hasattr(start_time, 'tzinfo') and start_time.tzinfo:
+            if hasattr(start_time, "tzinfo") and start_time.tzinfo:
                 from django.utils import timezone as django_timezone
+
                 now = django_timezone.now()
             else:
                 now = datetime.now()
         except:
             now = datetime.now()
-        
+
         hours_before = (start_time - now).total_seconds() / 3600
-        
+
         # Kiểm tra policy có áp dụng không
         if policy.hours_before_start and hours_before < policy.hours_before_start:
             # Quá thời hạn hủy, không hoàn tiền
             if policy.policy_type == RefundPolicy.PolicyType.NO_REFUND:
                 return 0.0
             # Hoặc áp dụng policy khác nếu có
-        
+
         # Tính refund dựa trên policy type
         if policy.policy_type == RefundPolicy.PolicyType.NO_REFUND:
             return 0.0
@@ -252,26 +271,25 @@ class BookingViewSet(viewsets.ModelViewSet):
                 refund = booking.final_price * 0.5  # Mặc định 50%
         else:
             refund = booking.final_price
-        
+
         # Trừ đi discount amount từ promotion (nếu có)
         # Vì promotion đã được áp dụng, không hoàn lại phần discount
         if booking.discount_amount > 0:
             refund = max(0, refund - booking.discount_amount)
-        
+
         return round(refund, 2)
 
     def process_payment_refund(self, booking, refund_amount):
         """Gọi API refund của payment gateway nếu đã thanh toán"""
         payments = Payment.objects.filter(
-            booking=booking,
-            status__in=[PaymentStatus.PAID, PaymentStatus.SUCCESS]
+            booking=booking, status__in=[PaymentStatus.PAID, PaymentStatus.SUCCESS]
         )
-        
+
         if not payments.exists():
             return None
-        
+
         payment = payments.first()
-        
+
         # Nếu thanh toán qua Stripe
         if payment.method == PaymentMethod.ONLINE and payment.transaction_id:
             try:
@@ -286,11 +304,11 @@ class BookingViewSet(viewsets.ModelViewSet):
                 # Log error nhưng vẫn tiếp tục
                 print(f"Stripe refund error: {e}")
                 return None
-        
+
         # Có thể thêm VNPAY, MOMO ở đây
         return None
 
-    @action(detail=True, methods=['post'], url_path='cancel')
+    @action(detail=True, methods=["post"], url_path="cancel")
     def cancel_booking(self, request, pk=None):
         """API hủy booking"""
         try:
@@ -298,58 +316,59 @@ class BookingViewSet(viewsets.ModelViewSet):
         except Booking.DoesNotExist:
             return Response(
                 {"isSuccess": False, "message": "Booking not found"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_404_NOT_FOUND,
             )
-        
+
         # Kiểm tra trạng thái booking
         if booking.status == BookingStatus.CANCELLED:
             return Response(
-                {
-                    "isSuccess": False,
-                    "message": "Booking đã bị hủy rồi"
-                },
-                status=status.HTTP_400_BAD_REQUEST
+                {"isSuccess": False, "message": "Booking đã bị hủy rồi"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         if booking.status == BookingStatus.COMPLETED:
             return Response(
-                {
-                    "isSuccess": False,
-                    "message": "Không thể hủy booking đã hoàn thành"
-                },
-                status=status.HTTP_400_BAD_REQUEST
+                {"isSuccess": False, "message": "Không thể hủy booking đã hoàn thành"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Chỉ cho hủy nếu ở trạng thái PENDING, CONFIRMED hoặc payment_status là UNPAID
         if booking.status not in [BookingStatus.PENDING, BookingStatus.CONFIRMED]:
             if booking.payment_status != PaymentStatus.UNPAID:
                 return Response(
                     {
                         "isSuccess": False,
-                        "message": "Chỉ có thể hủy booking ở trạng thái PENDING, CONFIRMED hoặc UNPAID"
+                        "message": "Chỉ có thể hủy booking ở trạng thái PENDING, CONFIRMED hoặc UNPAID",
                     },
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-        
+
         # Tính toán refund amount
         refund_amount = self.calculate_refund_amount(booking)
-        
+
         # Nếu đã thanh toán, gọi API refund
         refund_result = None
         if booking.payment_status in [PaymentStatus.PAID, PaymentStatus.SUCCESS]:
             refund_result = self.process_payment_refund(booking, refund_amount)
-        
+
         # Cập nhật booking
         booking.status = BookingStatus.CANCELLED
         if refund_amount > 0:
             booking.payment_status = PaymentStatus.REFUNDED
             booking.refund_amount = refund_amount
+            payments = booking.payments.all()
+            for payment in payments:
+                payment.status = PaymentStatus.REFUNDED
+                payment.save()
         else:
             booking.payment_status = PaymentStatus.CANCELLED
-        
+            for payment in payments:
+                payment.status = PaymentStatus.CANCELLED
+                payment.save()
+
         # Giữ nguyên final_price để audit
         booking.save()
-        
+
         return Response(
             {
                 "isSuccess": True,
@@ -361,10 +380,10 @@ class BookingViewSet(viewsets.ModelViewSet):
                 "refund_amount": refund_amount,
                 "final_price": booking.final_price,  # Giữ nguyên để audit
             },
-            status=status.HTTP_200_OK
+            status=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=['post'], url_path='rebook')
+    @action(detail=True, methods=["post"], url_path="rebook")
     def rebook_booking(self, request, pk=None):
         """API đặt lại booking từ booking cũ"""
         try:
@@ -372,38 +391,40 @@ class BookingViewSet(viewsets.ModelViewSet):
         except Booking.DoesNotExist:
             return Response(
                 {"isSuccess": False, "message": "Booking not found"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_404_NOT_FOUND,
             )
-        
+
         # Kiểm tra booking đã hủy chưa
         if old_booking.status != BookingStatus.CANCELLED:
             return Response(
-                {
-                    "isSuccess": False,
-                    "message": "Chỉ có thể đặt lại từ booking đã hủy"
-                },
-                status=status.HTTP_400_BAD_REQUEST
+                {"isSuccess": False, "message": "Chỉ có thể đặt lại từ booking đã hủy"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Clone dữ liệu booking
         new_booking_data = {
-            'service_type': old_booking.service_type,
-            'service_ref_ids': old_booking.service_ref_ids.copy() if old_booking.service_ref_ids else [],
-            'user': old_booking.user,
-            'total_price': old_booking.total_price,  # Có thể tính lại sau
-            'discount_amount': 0.0,  # Reset discount, sẽ tính lại
-            'final_price': old_booking.total_price,  # Tạm thời, sẽ tính lại
-            'status': BookingStatus.PENDING,
-            'payment_status': PaymentStatus.PENDING,
-            'refund_amount': None,  # Không copy refund_amount
+            "service_type": old_booking.service_type,
+            "service_ref_ids": (
+                old_booking.service_ref_ids.copy()
+                if old_booking.service_ref_ids
+                else []
+            ),
+            "user": old_booking.user,
+            "total_price": old_booking.total_price,  # Có thể tính lại sau
+            "discount_amount": 0.0,  # Reset discount, sẽ tính lại
+            "final_price": old_booking.total_price,  # Tạm thời, sẽ tính lại
+            "status": BookingStatus.PENDING,
+            "payment_status": PaymentStatus.PENDING,
+            "refund_amount": None,  # Không copy refund_amount
         }
-        
+
         # Tạo booking mới
         new_booking = Booking.objects.create(**new_booking_data)
-        
+
         # Copy guest info nếu có
-        if hasattr(old_booking, 'guest_info'):
+        if hasattr(old_booking, "guest_info"):
             from .models import GuestInfo
+
             old_guest = old_booking.guest_info
             GuestInfo.objects.create(
                 booking=new_booking,
@@ -413,11 +434,11 @@ class BookingViewSet(viewsets.ModelViewSet):
                 country=old_guest.country,
                 special_request=old_guest.special_request,
             )
-        
+
         # Clone service details dựa trên service_type
         service_type = old_booking.service_type
         data = None
-        
+
         if service_type == ServiceType.HOTEL:
             # Số lượng phòng lấy từ request, nếu không có thì dùng từ old_detail hoặc mặc định 1
             num_rooms = int(request.data.get("num_rooms", 1))
@@ -425,7 +446,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             if old_details.exists():
                 new_details = []
                 old_detail = old_details.first()  # Lấy detail đầu tiên làm mẫu
-                
+
                 # Tạo đúng số bản ghi RoomBookingDetail mới theo num_rooms
                 for i in range(num_rooms):
                     new_detail = RoomBookingDetail.objects.create(
@@ -435,24 +456,34 @@ class BookingViewSet(viewsets.ModelViewSet):
                         check_out=old_detail.check_out,
                         num_guests=old_detail.num_guests,
                         owner_hotel=old_detail.owner_hotel,
-                        room_type=old_detail.room.room_type if old_detail.room else (old_detail.room_type or "N/A"),
+                        room_type=(
+                            old_detail.room.room_type
+                            if old_detail.room
+                            else (old_detail.room_type or "N/A")
+                        ),
                         room_count=1,  # Mỗi detail là 1 phòng
                     )
                     new_details.append(new_detail)
-                
+
                 new_booking.service_ref_ids = [d.id for d in new_details]
                 new_booking.save(update_fields=["service_ref_ids"])
-                
+
                 # Serialize và thêm room_type vào response
-                serialized_data = RoomBookingDetailSerializer(new_details, many=True).data
+                serialized_data = RoomBookingDetailSerializer(
+                    new_details, many=True
+                ).data
                 data = [
                     {
                         **item,
-                        "room_type": detail.room.room_type if detail.room else (detail.room_type or "N/A")
+                        "room_type": (
+                            detail.room.room_type
+                            if detail.room
+                            else (detail.room_type or "N/A")
+                        ),
                     }
                     for item, detail in zip(serialized_data, new_details)
                 ]
-        
+
         elif service_type == ServiceType.CAR:
             old_details = CarBookingDetail.objects.filter(booking=old_booking)
             if old_details.exists():
@@ -481,51 +512,57 @@ class BookingViewSet(viewsets.ModelViewSet):
                 new_booking.service_ref_ids = [d.id for d in new_details]
                 new_booking.save(update_fields=["service_ref_ids"])
                 data = CarBookingDetailSerializer(new_details, many=True).data
-        
+
         elif service_type == ServiceType.FLIGHT:
             old_details = FlightBookingDetail.objects.filter(booking=old_booking)
             if old_details.exists():
                 new_details = []
                 for old_detail in old_details:
                     new_detail_data = {
-                        'booking': new_booking,
-                        'flight': old_detail.flight,
+                        "booking": new_booking,
+                        "flight": old_detail.flight,
                     }
                     for field in old_detail._meta.fields:
-                        if field.name not in ['id', 'booking', 'flight']:
+                        if field.name not in ["id", "booking", "flight"]:
                             if hasattr(old_detail, field.name):
-                                new_detail_data[field.name] = getattr(old_detail, field.name)
+                                new_detail_data[field.name] = getattr(
+                                    old_detail, field.name
+                                )
                     new_detail = FlightBookingDetail.objects.create(**new_detail_data)
                     new_details.append(new_detail)
                 new_booking.service_ref_ids = [d.id for d in new_details]
                 new_booking.save(update_fields=["service_ref_ids"])
                 data = FlightBookingDetailSerializer(new_details, many=True).data
-        
+
         elif service_type == ServiceType.ACTIVITY:
             old_details = ActivityDateBookingDetail.objects.filter(booking=old_booking)
             if old_details.exists():
                 new_details = []
                 for old_detail in old_details:
                     new_detail_data = {
-                        'booking': new_booking,
-                        'activity_date': old_detail.activity_date,
+                        "booking": new_booking,
+                        "activity_date": old_detail.activity_date,
                     }
                     for field in old_detail._meta.fields:
-                        if field.name not in ['id', 'booking', 'activity_date']:
+                        if field.name not in ["id", "booking", "activity_date"]:
                             if hasattr(old_detail, field.name):
-                                new_detail_data[field.name] = getattr(old_detail, field.name)
-                    new_detail = ActivityDateBookingDetail.objects.create(**new_detail_data)
+                                new_detail_data[field.name] = getattr(
+                                    old_detail, field.name
+                                )
+                    new_detail = ActivityDateBookingDetail.objects.create(
+                        **new_detail_data
+                    )
                     new_details.append(new_detail)
                 new_booking.service_ref_ids = [d.id for d in new_details]
                 new_booking.save(update_fields=["service_ref_ids"])
                 data = ActivityDateBookingDetailSerializer(new_details, many=True).data
-        
+
         # TODO: Tính lại giá nếu giá thay đổi theo ngày hiện tại
         # Có thể gọi lại logic tính giá từ service tương ứng
-        
+
         # TODO: Tính lại promotion mới (vì có thể hết hạn)
         # Có thể để user chọn promotion mới hoặc tự động tìm promotion active
-        
+
         return Response(
             {
                 "isSuccess": True,
@@ -540,9 +577,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         )
 
 
-
 class RefundPolicyViewSet(viewsets.ModelViewSet):
     """API CRUD cho RefundPolicy"""
+
     queryset = RefundPolicy.objects.all()
     serializer_class = RefundPolicySerializer
     authentication_classes = [JWTAuthentication]
@@ -567,24 +604,25 @@ class RefundPolicyViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            self.paginator.context = {'message': "Fetched all refund policies successfully!"}
+            self.paginator.context = {
+                "message": "Fetched all refund policies successfully!"
+            }
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            "isSuccess": True,
-            "message": "Fetched all refund policies successfully!",
-            "meta": {
-                "totalItems": queryset.count(),
-                "pagination": None
-            },
-            "data": serializer.data,
-        })
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched all refund policies successfully!",
+                "meta": {"totalItems": queryset.count(), "pagination": None},
+                "data": serializer.data,
+            }
+        )
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         refund_policy = serializer.save()
-        
+
         return Response(
             {
                 "isSuccess": True,
@@ -600,7 +638,7 @@ class RefundPolicyViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         refund_policy = serializer.save()
-        
+
         return Response(
             {
                 "isSuccess": True,
