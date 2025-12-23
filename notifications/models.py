@@ -30,15 +30,23 @@ class Notification(models.Model):
 
         recipient = self.email or (self.user.email if self.user else None)
         if creating and recipient and self._send_mail_flag:
-            # gửi email (nếu cần)
-            send_mail(
-                subject=self.title,
-                message=self.message,
-                from_email=None,
-                recipient_list=[recipient],
-                html_message=self.message_email,
-                fail_silently=False,
-            )
+            try:
+                # gửi email (nếu cần)
+                send_mail(
+                    subject=self.title,
+                    message=self.message,
+                    from_email=None,
+                    recipient_list=[recipient],
+                    html_message=self.message_email,
+                    fail_silently=False,
+                )
+            except Exception as e:
+                # Log lỗi (dùng logging hoặc print cho dev)
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send email to {recipient}: {str(e)}")
+                # Có thể set flag lỗi nếu cần: self.is_error = True; self.save(update_fields=['is_error'])
 
         # Gửi realtime đến user (nếu có)
         if creating and self.user:

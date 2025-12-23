@@ -166,7 +166,9 @@ class HotelListView(generics.ListAPIView):
         if child:
             try:
                 child = int(child)
-                queryset = queryset.filter(rooms__children_capacity__gte=child).distinct()
+                queryset = queryset.filter(
+                    rooms__children_capacity__gte=child
+                ).distinct()
             except ValueError:
                 pass
 
@@ -176,7 +178,9 @@ class HotelListView(generics.ListAPIView):
                 room = int(room)
                 # Filter hotels có tổng available_rooms >= room (cho tất cả rooms hoặc tổng)
                 # Giả sử tổng available_rooms của hotel >= room
-                queryset = queryset.annotate(total_available=Sum('rooms__available_rooms')).filter(total_available__gte=room)
+                queryset = queryset.annotate(
+                    total_available=Sum("rooms__available_rooms")
+                ).filter(total_available__gte=room)
             except ValueError:
                 pass
 
@@ -186,13 +190,13 @@ class HotelListView(generics.ListAPIView):
         if startDate and endDate:
             try:
                 from datetime import datetime
+
                 sd = datetime.strptime(startDate, "%Y-%m-%d").date()
                 ed = datetime.strptime(endDate, "%Y-%m-%d").date()
                 if sd <= ed:
                     # Filter hotels có rooms available trong khoảng ngày
                     queryset = queryset.filter(
-                        rooms__start_date__lte=sd,
-                        rooms__end_date__gte=ed
+                        rooms__start_date__lte=sd, rooms__end_date__gte=ed
                     ).distinct()
             except ValueError:
                 pass
