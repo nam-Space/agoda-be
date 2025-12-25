@@ -62,6 +62,7 @@ class CarBookingDetailSerializer(serializers.ModelSerializer):
             "lat2",
             "lng2",
             "pickup_datetime",
+            "dropoff_datetime",
             "driver_required",
             "distance_km",
             "total_time_estimate",
@@ -70,6 +71,7 @@ class CarBookingDetailSerializer(serializers.ModelSerializer):
             "total_price",
             "discount_amount",
             "final_price",
+            "status",
         ]
 
 
@@ -89,11 +91,43 @@ class CarBookingDetailCreateSerializer(serializers.ModelSerializer):
             "lat2",
             "lng2",
             "pickup_datetime",
+            "dropoff_datetime",
             "driver_required",
             "distance_km",
             "total_time_estimate",
             "passenger_quantity_booking",
+            "status",
         ]
+
+
+class CarBookingUpdateSerializer(serializers.ModelSerializer):
+    car = serializers.PrimaryKeyRelatedField(
+        queryset=Car.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = CarBookingDetail
+        fields = [
+            "car",
+            "pickup_location",
+            "dropoff_location",
+            "lat1",
+            "lng1",
+            "lat2",
+            "lng2",
+            "pickup_datetime",
+            "dropoff_datetime",
+            "driver_required",
+            "distance_km",
+            "total_time_estimate",
+            "passenger_quantity_booking",
+            "status",
+        ]
+        extra_kwargs = {
+            field: {"required": False, "allow_null": True} for field in fields
+        }
 
 
 class UserCarInteractionSerializer(serializers.ModelSerializer):

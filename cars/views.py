@@ -22,6 +22,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.db.models import Q, OuterRef, Subquery, Value
 from django.db.models import Avg, F, FloatField, ExpressionWrapper, functions as Func
+from .serializers import CarBookingUpdateSerializer
 
 
 # Phân trang
@@ -35,12 +36,22 @@ class CarPagination(PageNumberPagination):
         page_size = request.query_params.get("pageSize")
         currentPage = request.query_params.get("current")
         user_id = request.query_params.get("user_id")
+        driver_status = request.query_params.get("driver_status")
 
         if user_id:
             self.filters["user_id"] = user_id
+        if driver_status:
+            self.filters["user__driver_status"] = driver_status
 
         for field, value in request.query_params.items():
-            if field not in ["current", "pageSize", "user_id", "recommended", "sort"]:
+            if field not in [
+                "current",
+                "pageSize",
+                "user_id",
+                "driver_status",
+                "recommended",
+                "sort",
+            ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
 
@@ -104,6 +115,10 @@ class CarListView(generics.ListAPIView):
             except ValueError:
                 return Car.objects.none()
 
+        driver_status = filter_params.get("driver_status")
+        if driver_status:
+            queryset = queryset.filter(user__driver_status=driver_status)
+
         query_filter = Q()
 
         for field, value in filter_params.items():
@@ -111,6 +126,7 @@ class CarListView(generics.ListAPIView):
                 "pageSize",
                 "current",
                 "user_id",
+                "driver_status",
                 "recommended",
                 "sort",
             ]:  # Bỏ qua các trường phân trang
@@ -298,6 +314,31 @@ class CarBookingDetailView(generics.RetrieveUpdateDestroyAPIView):
                 "isSuccess": True,
                 "message": "Car booking details fetched successfully",
                 "data": serializer.data,  # Dữ liệu xe đặt
+            }
+        )
+
+
+class CarBookingUpdateView(generics.RetrieveUpdateAPIView):
+    queryset = CarBookingDetail.objects.all()
+    serializer_class = CarBookingUpdateSerializer
+    authentication_classes = []
+    permission_classes = []
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance,
+            data=request.data,
+            partial=True,  # ⭐ QUAN TRỌNG
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Car booking updated successfully",
+                "data": serializer.data,
             }
         )
 

@@ -7,6 +7,7 @@ from .views import (
     CarUpdateView,
     CarDeleteView,
     CarBookingDetailView,
+    CarBookingUpdateView,
     UserCarInteractionDetailView,
     UserCarInteractionUpsertView,
 )
@@ -27,6 +28,11 @@ urlpatterns = [
         "cars-booking/<int:pk>/",
         CarBookingDetailView.as_view(),
         name="car-booking-detail",
+    ),
+    path(
+        "cars-booking/<int:pk>/update/",
+        CarBookingUpdateView.as_view(),
+        name="car-booking-update",
     ),
     path(
         "user-car-interaction/<int:car_id>/",
