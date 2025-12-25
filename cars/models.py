@@ -1,6 +1,7 @@
 from django.db import models
 from accounts.models import CustomUser
 from bookings.models import Booking
+from cars.constants.car_booking_status import CarBookingStatus
 
 
 class Car(models.Model):
@@ -118,7 +119,8 @@ class CarBookingDetail(models.Model):
     lng1 = models.FloatField(null=True, blank=True)
     lat2 = models.FloatField(null=True, blank=True)
     lng2 = models.FloatField(null=True, blank=True)
-    pickup_datetime = models.DateTimeField()
+    pickup_datetime = models.DateTimeField(null=True, blank=True)
+    dropoff_datetime = models.DateTimeField(null=True, blank=True)
     driver_required = models.BooleanField(default=True)
     distance_km = models.FloatField(default=0.0)
     total_time_estimate = models.FloatField(default=0.0)
@@ -130,6 +132,11 @@ class CarBookingDetail(models.Model):
         null=True,
         blank=True,
     )
+    status = models.CharField(
+        max_length=20,
+        choices=CarBookingStatus.choices,
+        default=CarBookingStatus.STARTING,
+    )
 
     total_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     discount_amount = models.FloatField(default=0.0)
@@ -139,6 +146,18 @@ class CarBookingDetail(models.Model):
         # ✅ Tự động gán chủ khách sạn khi tạo booking
         if self.car and not self.driver:
             self.driver = self.car.user
+
+        # =========================
+        # 🎯 CẬP NHẬT DRIVER STATUS
+        # =========================
+        if self.driver:
+            if self.status == CarBookingStatus.ARRIVED:
+                self.driver.driver_status = "idle"
+            else:
+                self.driver.driver_status = "busy"
+
+            # Chỉ update field cần thiết
+            self.driver.save(update_fields=["driver_status"])
 
         # Tính toán giảm giá nếu có promotion (giả sử có hàm get_active_promotion ở car)
         if self.car and hasattr(self.car, "get_active_promotion"):

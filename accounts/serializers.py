@@ -63,6 +63,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "avatar",
             "manager",
             "flight_operation_manager",
+            "driver_status",
         ]
         extra_kwargs = {
             "password": {"write_only": True},
@@ -70,6 +71,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "avatar": {"required": False},
             "manager": {"required": False},
             "flight_operation_manager": {"required": False},
+            "driver_status": {"required": False},
         }
 
     def create(self, validated_data):
@@ -166,6 +168,7 @@ class UserSerializer(serializers.ModelSerializer):
             "airline",
             "flight_operation_manager",
             "flight_staffs",
+            "driver_status",
         ]
         extra_kwargs = {"birthday": {"required": False}}
 
@@ -222,6 +225,7 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
             "hotel",
             "flight_operation_manager",
             "airline",
+            "driver_status",
         ]
         extra_kwargs = {
             "birthday": {"required": False},
@@ -229,6 +233,7 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
             "hotel": {"required": False},
             "flight_operation_manager": {"required": False},
             "airline": {"required": False},
+            "driver_status": {"required": False},
         }
 
     def update(self, instance, validated_data):

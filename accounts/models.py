@@ -58,5 +58,16 @@ class CustomUser(AbstractUser):
         blank=True,
     )
 
+    DRIVER_STATUS_CHOICES = [
+        ("idle", "Idle"),
+        ("busy", "Busy"),
+    ]
+
+    driver_status = models.CharField(
+        max_length=6,
+        choices=DRIVER_STATUS_CHOICES,
+        default="idle",
+    )
+
     def __str__(self):
         return self.username
