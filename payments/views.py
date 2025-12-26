@@ -2531,6 +2531,8 @@ class PaymentPagination(PageNumberPagination):
         date_launch_activity = request.query_params.get("date_launch_activity")
         min_pickup_datetime_car = request.query_params.get("min_pickup_datetime_car")
         max_pickup_datetime_car = request.query_params.get("max_pickup_datetime_car")
+        min_dropoff_datetime_car = request.query_params.get("min_dropoff_datetime_car")
+        max_dropoff_datetime_car = request.query_params.get("max_dropoff_datetime_car")
         flight_operations_staff_id = request.query_params.get(
             "flight_operations_staff_id"
         )
@@ -2615,6 +2617,16 @@ class PaymentPagination(PageNumberPagination):
                 max_pickup_datetime_car
             )
 
+        if min_dropoff_datetime_car:
+            self.filters["booking__car_detail__dropoff_datetime__gte"] = (
+                min_dropoff_datetime_car
+            )
+
+        if max_dropoff_datetime_car:
+            self.filters["booking__car_detail__dropoff_datetime__lte"] = (
+                max_dropoff_datetime_car
+            )
+
         if flight_operations_staff_id:
             # chỉ áp dụng cho booking có service_type là FLIGHT
             self.filters["booking__service_type"] = ServiceType.FLIGHT
@@ -2651,6 +2663,8 @@ class PaymentPagination(PageNumberPagination):
                 "date_launch_activity",
                 "min_pickup_datetime_car",
                 "max_pickup_datetime_car",
+                "min_dropoff_datetime_car",
+                "max_dropoff_datetime_car",
                 "flight_operations_staff_id",
                 "flight_id",
                 "min_flight_leg_departure",
@@ -2902,6 +2916,17 @@ class PaymentListView(generics.ListAPIView):
                 booking__car_detail__pickup_datetime__lte=max_pickup_datetime_car,
             )
 
+        min_dropoff_datetime_car = filter_params.get("min_dropoff_datetime_car")
+        if min_dropoff_datetime_car:
+            queryset = queryset.filter(
+                booking__car_detail__dropoff_datetime__gte=min_dropoff_datetime_car,
+            )
+        max_dropoff_datetime_car = filter_params.get("max_dropoff_datetime_car")
+        if max_dropoff_datetime_car:
+            queryset = queryset.filter(
+                booking__car_detail__dropoff_datetime__lte=max_dropoff_datetime_car,
+            )
+
         min_flight_leg_departure = filter_params.get("min_flight_leg_departure")
         max_flight_leg_departure = filter_params.get("max_flight_leg_departure")
 
@@ -2954,6 +2979,8 @@ class PaymentListView(generics.ListAPIView):
                 "max_date_launch_activity",
                 "min_pickup_datetime_car",
                 "max_pickup_datetime_car",
+                "min_dropoff_datetime_car",
+                "max_dropoff_datetime_car",
                 "flight_operations_staff_id",
                 "flight_id",
                 "date_launch_activity",

@@ -16,10 +16,8 @@ class Car(models.Model):
     description = models.TextField(blank=True, null=True)
     capacity = models.PositiveIntegerField()  # số chỗ ngồi
     luggage = models.PositiveIntegerField(null=True)  # số hành lý
-    avg_star = models.DecimalField(
-        max_digits=2, decimal_places=1, default=0.0
-    )  # VD: 4.5 sao
-    price_per_km = models.DecimalField(max_digits=10, decimal_places=2)
+    avg_star = models.FloatField(default=0.0)
+    price_per_km = models.FloatField(default=0.0)
     avg_speed = models.FloatField(default=0.0)
     image = models.CharField(max_length=255, null=True, blank=True)
     total_booking_count = models.PositiveIntegerField(default=0)
@@ -158,6 +156,13 @@ class CarBookingDetail(models.Model):
 
             # Chỉ update field cần thiết
             self.driver.save(update_fields=["driver_status"])
+
+        # Tính total_price từ giá và số lượng
+        self.total_price = (
+            (self.car.price_per_km or 0)
+            * (self.distance_km or 0)
+            * (self.passenger_quantity_booking or 0)
+        )
 
         # Tính toán giảm giá nếu có promotion (giả sử có hàm get_active_promotion ở car)
         if self.car and hasattr(self.car, "get_active_promotion"):
