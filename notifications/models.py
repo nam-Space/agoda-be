@@ -62,7 +62,14 @@ class Notification(models.Model):
                     # thêm các dữ liệu khác nếu cần
                 },
             }
-            # async_to_sync để gọi từ sync context (save)
-            async_to_sync(channel_layer.group_send)(
-                f"user_{self.user.id}_notifications", payload
-            )
+            try:
+                # async_to_sync để gọi từ sync context (save)
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{self.user.id}_notifications", payload
+                )
+            except Exception as e:
+                # Log lỗi (dùng logging hoặc print cho dev)
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send email to {recipient}: {str(e)}")
