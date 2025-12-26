@@ -72,4 +72,4 @@ class Notification(models.Model):
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.error(f"Failed to send email to {recipient}: {str(e)}")
+                logger.error(f"Failed to send group to user: {str(e)}")
