@@ -192,10 +192,14 @@ class FlightBookingDetail(models.Model):
             if promo:
                 percent = float(promo.get("discount_percent") or 0)
                 amount = float(promo.get("discount_amount") or 0)
-                if amount > 0:
+                if percent > 0:
+                    percent_discount = float(self.total_price) * percent / 100
+                    if amount > 0:
+                        self.discount_amount = min(percent_discount, amount)
+                    else:
+                        self.discount_amount = percent_discount
+                elif amount > 0:
                     self.discount_amount = min(amount, float(self.total_price))
-                elif percent > 0:
-                    self.discount_amount = float(self.total_price) * percent / 100
                 else:
                     self.discount_amount = 0
                 self.final_price = float(self.total_price) - self.discount_amount

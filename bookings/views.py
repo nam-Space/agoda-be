@@ -233,9 +233,9 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         # Tính số giờ trước khi bắt đầu
         # Đảm bảo start_time là datetime object
-        start_time = self.ensure_datetime(start_time)
-        if not start_time:
-            return booking.final_price
+        # start_time = self.ensure_datetime(start_time)
+        # if not start_time:
+        #     return booking.final_price
 
         # Lấy timezone từ start_time nếu có, nếu không dùng timezone naive
         try:
@@ -274,8 +274,8 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         # Trừ đi discount amount từ promotion (nếu có)
         # Vì promotion đã được áp dụng, không hoàn lại phần discount
-        if booking.discount_amount > 0:
-            refund = max(0, refund - booking.discount_amount)
+        # if booking.discount_amount > 0:
+        #     refund = max(0, refund - booking.discount_amount)
 
         return round(refund, 2)
 
