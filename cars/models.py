@@ -209,7 +209,9 @@ class CarBookingDetail(models.Model):
             self.booking.total_price = sum(
                 getattr(d, "total_price", 0) for d in details
             )
-            self.booking.save(update_fields=["discount_amount", "final_price", "total_price"])
+            self.booking.save(
+                update_fields=["discount_amount", "final_price", "total_price"]
+            )
 
     def __str__(self):
         return f"CarBooking for {self.booking.booking_code}"
