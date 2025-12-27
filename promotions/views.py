@@ -305,40 +305,42 @@ class PromotionDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # Endpoint chung để tạo promotion với cấu trúc mới
 class PromotionCreateView(generics.CreateAPIView):
-    serializer_class = PromotionCreateSerializer
+    # serializer_class = PromotionCreateSerializer  # Không dùng serializer nữa
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        data = request.data
+        promotion_id = data.get("promotion_id")
+        promotion_type = data.get("type")
 
-        data = serializer.validated_data
-        # promotion_id = data["promotion_id"]
-        promotion_type = data["type"]
+        if not promotion_id:
+            return Response(
+                {
+                    "isSuccess": False,
+                    "message": "promotion_id is required",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not promotion_type:
+            return Response(
+                {
+                    "isSuccess": False,
+                    "message": "type is required",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # try:
-        #     promotion = Promotion.objects.get(id=promotion_id)
-        # except Promotion.DoesNotExist:
-        #     return Response(
-        #         {
-        #             "isSuccess": False,
-        #             "message": "Tạo promotion thất bại",
-        #             "error": "Không tìm thấy promotion",
-        #         },
-        #         status=status.HTTP_404_NOT_FOUND,
-        #     )
-
-        promotion = Promotion.objects.create(
-            title=data.get("title", "Promotion"),
-            description=data.get("description", None),
-            discount_percent=data.get("discount_percent", None),
-            discount_amount=data.get("discount_amount", None),
-            start_date=data.get("start_date", None),
-            end_date=data.get("end_date", None),
-            promotion_type=getattr(PromotionType, promotion_type.upper()),
-            image=data.get("image", None),
-        )
-
-        promotion_id = promotion.id
+        # Lấy promotion đã tồn tại
+        try:
+            promotion = Promotion.objects.get(id=promotion_id)
+        except Promotion.DoesNotExist:
+            return Response(
+                {
+                    "isSuccess": False,
+                    "message": "Tạo promotion thất bại",
+                    "error": f"Promotion với id {promotion_id} không tồn tại",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Kiểm tra promotion_type phù hợp
         if (
@@ -393,28 +395,26 @@ class PromotionCreateView(generics.CreateAPIView):
             # hotel_id = data["hotel_id"]
             rooms_data = data["rooms"]
 
-            # try:
-            #     hotel = Hotel.objects.get(id=hotel_id)
-            # except Hotel.DoesNotExist:
-            #     return Response(
-            #         {
-            #             "isSuccess": False,
-            #             "message": "Tạo promotion thất bại",
-            #             "error": "Không tìm thấy hotel",
-            #         },
-            #         status=status.HTTP_404_NOT_FOUND,
-            #     )
-
             # Tạo RoomPromotion cho từng room
             rooms_response = []
             for room_data in rooms_data:
                 try:
                     room = Room.objects.get(id=room_data["id"], hotel=hotel)
+                    discount_percent = (
+                        room_data["discount_percent"]
+                        if "discount_percent" in room_data and room_data["discount_percent"] is not None
+                        else promotion.discount_percent
+                    )
+                    discount_amount = (
+                        room_data["discount_amount"]
+                        if "discount_amount" in room_data and room_data["discount_amount"] is not None
+                        else promotion.discount_amount
+                    )
                     room_promotion = RoomPromotion.objects.create(
                         promotion=promotion,
                         room=room,
-                        discount_percent=room_data.get("discount_percent"),
-                        discount_amount=room_data.get("discount_amount"),
+                        discount_percent=discount_percent,
+                        discount_amount=discount_amount,
                     )
                     rooms_response.append(
                         {
@@ -431,10 +431,7 @@ class PromotionCreateView(generics.CreateAPIView):
                             ),
                         }
                     )
-                # except Room.DoesNotExist:
-                #     errors.append(
-                #         f"Room {room_data['id']} không tồn tại hoặc không thuộc hotel {hotel_id}"
-                #     )
+
                 except Exception as e:
                     errors.append(
                         f"Lỗi khi tạo promotion cho room {room_data['id']}: {str(e)}"
@@ -451,28 +448,26 @@ class PromotionCreateView(generics.CreateAPIView):
             # airline_id = data["airline_id"]
             flights_data = data["flights"]
 
-            # try:
-            #     airline = Airline.objects.get(id=airline_id)
-            # except Airline.DoesNotExist:
-            #     return Response(
-            #         {
-            #             "isSuccess": False,
-            #             "message": "Tạo promotion thất bại",
-            #             "error": "Không tìm thấy airline",
-            #         },
-            #         status=status.HTTP_404_NOT_FOUND,
-            #     )
-
             # Tạo FlightPromotion cho từng flight
             flights_response = []
             for flight_data in flights_data:
                 try:
                     flight = Flight.objects.get(id=flight_data["id"])
+                    discount_percent = (
+                        flight_data["discount_percent"]
+                        if "discount_percent" in flight_data and flight_data["discount_percent"] is not None
+                        else promotion.discount_percent
+                    )
+                    discount_amount = (
+                        flight_data["discount_amount"]
+                        if "discount_amount" in flight_data and flight_data["discount_amount"] is not None
+                        else promotion.discount_amount
+                    )
                     flight_promotion = FlightPromotion.objects.create(
                         promotion=promotion,
                         flight=flight,
-                        discount_percent=flight_data.get("discount_percent"),
-                        discount_amount=flight_data.get("discount_amount"),
+                        discount_percent=discount_percent,
+                        discount_amount=discount_amount,
                     )
                     flights_response.append(
                         {
@@ -489,10 +484,6 @@ class PromotionCreateView(generics.CreateAPIView):
                             ),
                         }
                     )
-                # except Flight.DoesNotExist:
-                #     errors.append(
-                #         f"Flight {flight_data['id']} không tồn tại hoặc không thuộc airline {airline_id}"
-                #     )
                 except Exception as e:
                     errors.append(
                         f"Lỗi khi tạo promotion cho flight {flight_data['id']}: {str(e)}"
@@ -518,11 +509,21 @@ class PromotionCreateView(generics.CreateAPIView):
                 for act_date_data in act_dates_data:
                     try:
                         activity_date = ActivityDate.objects.get(id=act_date_data["id"])
+                        discount_percent = (
+                            act_date_data["discount_percent"]
+                            if "discount_percent" in act_date_data and act_date_data["discount_percent"] is not None
+                            else promotion.discount_percent
+                        )
+                        discount_amount = (
+                            act_date_data["discount_amount"]
+                            if "discount_amount" in act_date_data and act_date_data["discount_amount"] is not None
+                            else promotion.discount_amount
+                        )
                         activity_promotion = ActivityPromotion.objects.create(
                             promotion=promotion,
                             activity_date=activity_date,
-                            discount_percent=act_date_data.get("discount_percent"),
-                            discount_amount=act_date_data.get("discount_amount"),
+                            discount_percent=discount_percent,
+                            discount_amount=discount_amount,
                         )
                         act_dates_response.append(
                             {
@@ -565,11 +566,21 @@ class PromotionCreateView(generics.CreateAPIView):
             for car_data in cars_data:
                 try:
                     car = Car.objects.get(id=car_data["id"])
+                    discount_percent = (
+                        car_data["discount_percent"]
+                        if "discount_percent" in car_data and car_data["discount_percent"] is not None
+                        else promotion.discount_percent
+                    )
+                    discount_amount = (
+                        car_data["discount_amount"]
+                        if "discount_amount" in car_data and car_data["discount_amount"] is not None
+                        else promotion.discount_amount
+                    )
                     car_promotion = CarPromotion.objects.create(
                         promotion=promotion,
                         car=car,
-                        discount_percent=car_data.get("discount_percent"),
-                        discount_amount=car_data.get("discount_amount"),
+                        discount_percent=discount_percent,
+                        discount_amount=discount_amount,
                     )
                     cars_response.append(
                         {
