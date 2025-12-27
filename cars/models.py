@@ -159,9 +159,9 @@ class CarBookingDetail(models.Model):
 
         # Tính total_price từ giá và số lượng
         self.total_price = (
-            (self.car.price_per_km or 0)
-            * (self.distance_km or 0)
-            * (self.passenger_quantity_booking or 0)
+            float(self.car.price_per_km or 0)
+            * float(self.distance_km or 0)
+            * float(self.passenger_quantity_booking or 0)
         )
 
         # Tính toán giảm giá nếu có promotion (giả sử có hàm get_active_promotion ở car)
@@ -206,7 +206,10 @@ class CarBookingDetail(models.Model):
             self.booking.final_price = sum(
                 getattr(d, "final_price", 0) for d in details
             )
-            self.booking.save(update_fields=["discount_amount", "final_price"])
+            self.booking.total_price = sum(
+                getattr(d, "total_price", 0) for d in details
+            )
+            self.booking.save(update_fields=["discount_amount", "final_price", "total_price"])
 
     def __str__(self):
         return f"CarBooking for {self.booking.booking_code}"
