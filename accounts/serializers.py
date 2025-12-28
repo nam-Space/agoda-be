@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 
 from hotels.models import Hotel
 from airlines.models import Airline
+from cities.models import City
 
 
 # Serializer cho việc đăng ký người dùng mới
@@ -47,6 +48,9 @@ class CreateUserSerializer(serializers.ModelSerializer):
     flight_operation_manager = serializers.PrimaryKeyRelatedField(
         queryset=get_user_model().objects.all(), required=False, allow_null=True
     )
+    driver_area = serializers.PrimaryKeyRelatedField(
+        queryset=get_user_model().objects.all(), required=False, allow_null=True
+    )
 
     class Meta:
         model = get_user_model()
@@ -64,6 +68,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "manager",
             "flight_operation_manager",
             "driver_status",
+            "driver_area",
         ]
         extra_kwargs = {
             "password": {"write_only": True},
@@ -72,6 +77,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "manager": {"required": False},
             "flight_operation_manager": {"required": False},
             "driver_status": {"required": False},
+            "driver_area": {"required": False},
         }
 
     def create(self, validated_data):
@@ -146,6 +152,7 @@ class UserSerializer(serializers.ModelSerializer):
     flight_staffs = UserStaffSimpleSerializer(
         many=True, read_only=True
     )  # nhân viên bán vé máy bay
+    driver_area = serializers.SerializerMethodField()
 
     class Meta:
         model = get_user_model()
@@ -169,6 +176,7 @@ class UserSerializer(serializers.ModelSerializer):
             "flight_operation_manager",
             "flight_staffs",
             "driver_status",
+            "driver_area",
         ]
         extra_kwargs = {"birthday": {"required": False}}
 
@@ -188,6 +196,14 @@ class UserSerializer(serializers.ModelSerializer):
             return AirlineSimpleSerializer(obj.airline).data
         return None
 
+    def get_driver_area(self, obj):
+        # import lazy để tránh circular import
+        from cities.serializers import CitySimpleSerializer
+
+        if hasattr(obj, "driver_area") and obj.driver_area:
+            return CitySimpleSerializer(obj.driver_area).data
+        return None
+
 
 # Serializer cho thông tin người dùng (có mật khẩu)
 class UserAndPasswordSerializer(serializers.ModelSerializer):
@@ -203,6 +219,9 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
     )
     airline = serializers.PrimaryKeyRelatedField(
         queryset=Airline.objects.all(), required=False, allow_null=True
+    )
+    driver_area = serializers.PrimaryKeyRelatedField(
+        queryset=City.objects.all(), required=False, allow_null=True
     )
 
     class Meta:
@@ -226,6 +245,7 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
             "flight_operation_manager",
             "airline",
             "driver_status",
+            "driver_area",
         ]
         extra_kwargs = {
             "birthday": {"required": False},
@@ -234,6 +254,7 @@ class UserAndPasswordSerializer(serializers.ModelSerializer):
             "flight_operation_manager": {"required": False},
             "airline": {"required": False},
             "driver_status": {"required": False},
+            "driver_area": {"required": False},
         }
 
     def update(self, instance, validated_data):

@@ -68,6 +68,13 @@ class CustomUser(AbstractUser):
         choices=DRIVER_STATUS_CHOICES,
         default="idle",
     )
+    driver_area = models.ForeignKey(
+        "cities.City",
+        on_delete=models.SET_NULL,
+        related_name="drivers",
+        null=True,
+        blank=True,
+    )
 
     def __str__(self):
         return self.username
