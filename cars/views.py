@@ -23,6 +23,7 @@ from django.db.models.functions import Coalesce
 from django.db.models import Q, OuterRef, Subquery, Value
 from django.db.models import Avg, F, FloatField, ExpressionWrapper, functions as Func
 from .serializers import CarBookingUpdateSerializer
+import re
 
 
 # Phân trang
@@ -37,11 +38,16 @@ class CarPagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
         user_id = request.query_params.get("user_id")
         driver_status = request.query_params.get("driver_status")
+        driver_area_name = request.query_params.get("driver_area_name")
 
         if user_id:
             self.filters["user_id"] = user_id
         if driver_status:
             self.filters["user__driver_status"] = driver_status
+        if driver_area_name:
+            driver_area_name = driver_area_name.replace("\u00a0", " ")
+            normalized_name = re.sub(r"\s+", " ", driver_area_name.strip())
+            self.filters["user__driver_area__name__icontains"] = normalized_name
 
         for field, value in request.query_params.items():
             if field not in [
@@ -49,6 +55,7 @@ class CarPagination(PageNumberPagination):
                 "pageSize",
                 "user_id",
                 "driver_status",
+                "driver_area_name",
                 "recommended",
                 "sort",
             ]:
@@ -119,6 +126,14 @@ class CarListView(generics.ListAPIView):
         if driver_status:
             queryset = queryset.filter(user__driver_status=driver_status)
 
+        driver_area_name = filter_params.get("driver_area_name")
+        if driver_area_name:
+            driver_area_name = driver_area_name.replace("\u00a0", " ")
+            normalized_name = re.sub(r"\s+", " ", driver_area_name.strip())
+            queryset = queryset.filter(
+                user__driver_area__name__icontains=normalized_name
+            )
+
         query_filter = Q()
 
         for field, value in filter_params.items():
@@ -127,6 +142,7 @@ class CarListView(generics.ListAPIView):
                 "current",
                 "user_id",
                 "driver_status",
+                "driver_area_name",
                 "recommended",
                 "sort",
             ]:  # Bỏ qua các trường phân trang
