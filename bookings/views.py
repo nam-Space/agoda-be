@@ -443,7 +443,11 @@ class BookingViewSet(viewsets.ModelViewSet):
             # Số lượng phòng lấy từ request, nếu không có thì dùng tổng room_count từ old_details
             old_details = RoomBookingDetail.objects.filter(booking=old_booking)
             # total_rooms_old = sum(detail.room_count for detail in old_details) if old_details.exists() else 1
-            num_rooms = int(request.data.get("num_rooms")) if request.data.get("num_rooms") else old_details.first().room_count
+            num_rooms = (
+                int(request.data.get("num_rooms"))
+                if request.data.get("num_rooms")
+                else old_details.first().room_count
+            )
             if old_details.exists():
                 new_details = []
                 old_detail = old_details.first()  # Lấy detail đầu tiên làm mẫu
@@ -562,6 +566,14 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         # TODO: Tính lại promotion mới (vì có thể hết hạn)
         # Có thể để user chọn promotion mới hoặc tự động tìm promotion active
+
+        payments = old_booking.payments.all()
+        old_booking.status = BookingStatus.REBOOKED
+        old_booking.payment_status = PaymentStatus.REBOOKED
+        old_booking.save()
+        for payment in payments:
+            payment.status = PaymentStatus.REBOOKED
+            payment.save()
 
         return Response(
             {
