@@ -440,30 +440,30 @@ class BookingViewSet(viewsets.ModelViewSet):
         data = None
 
         if service_type == ServiceType.HOTEL:
-            # Số lượng phòng lấy từ request, nếu không có thì dùng từ old_detail hoặc mặc định 1
-            num_rooms = int(request.data.get("num_rooms", 1))
+            # Số lượng phòng lấy từ request, nếu không có thì dùng tổng room_count từ old_details
             old_details = RoomBookingDetail.objects.filter(booking=old_booking)
+            # total_rooms_old = sum(detail.room_count for detail in old_details) if old_details.exists() else 1
+            num_rooms = int(request.data.get("num_rooms")) if request.data.get("num_rooms") else old_details.first().room_count
             if old_details.exists():
                 new_details = []
                 old_detail = old_details.first()  # Lấy detail đầu tiên làm mẫu
 
-                # Tạo đúng số bản ghi RoomBookingDetail mới theo num_rooms
-                for i in range(num_rooms):
-                    new_detail = RoomBookingDetail.objects.create(
-                        booking=new_booking,
-                        room=old_detail.room,
-                        check_in=old_detail.check_in,
-                        check_out=old_detail.check_out,
-                        num_guests=old_detail.num_guests,
-                        owner_hotel=old_detail.owner_hotel,
-                        room_type=(
-                            old_detail.room.room_type
-                            if old_detail.room
-                            else (old_detail.room_type or "N/A")
-                        ),
-                        room_count=1,  # Mỗi detail là 1 phòng
-                    )
-                    new_details.append(new_detail)
+                # Tạo 1 bản ghi RoomBookingDetail với room_count = num_rooms
+                new_detail = RoomBookingDetail.objects.create(
+                    booking=new_booking,
+                    room=old_detail.room,
+                    check_in=old_detail.check_in,
+                    check_out=old_detail.check_out,
+                    num_guests=old_detail.num_guests,
+                    owner_hotel=old_detail.owner_hotel,
+                    room_type=(
+                        old_detail.room.room_type
+                        if old_detail.room
+                        else (old_detail.room_type or "N/A")
+                    ),
+                    room_count=num_rooms,  # Sử dụng num_rooms
+                )
+                new_details = [new_detail]
 
                 new_booking.service_ref_ids = [d.id for d in new_details]
                 new_booking.save(update_fields=["service_ref_ids"])
