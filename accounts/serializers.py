@@ -177,6 +177,7 @@ class UserSerializer(serializers.ModelSerializer):
             "flight_staffs",
             "driver_status",
             "driver_area",
+            "chatbot_id",
         ]
         extra_kwargs = {"birthday": {"required": False}}
 

@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "accommodationtype",
     "travelguide",
     "handbooks",
+    "chatbots",
 ]
 
 # =========================
@@ -236,3 +237,7 @@ STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY")
 # =========================
 FRONT_END_URL = config("FRONT_END_URL")
 ADMIN_URL = config("ADMIN_URL")
+
+AYD_CHATBOT_ID = config("AYD_CHATBOT_ID")
+AYD_WIDGET_ID = config("AYD_WIDGET_ID")
+AYD_API_KEY = config("AYD_API_KEY")
