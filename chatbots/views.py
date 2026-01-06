@@ -97,10 +97,10 @@ def create_new_chat(request):
             return JsonResponse({"error": "User not found"}, status=404)
 
         # 2️⃣ Nếu user đã có chatbot → trả luôn
-        if user.chatbot_id:
+        if user.chat_id:
             return JsonResponse(
                 {
-                    "chatid": user.chatbot_id,
+                    "chatid": user.chat_id,
                     "user_id": user.id,
                     "message": "Chat already exists",
                 }
@@ -134,9 +134,9 @@ def create_new_chat(request):
                 status=500,
             )
 
-        # 4️⃣ Lưu chatbot_id vào user
-        user.chatbot_id = chat_id
-        user.save(update_fields=["chatbot_id"])
+        # 4️⃣ Lưu chat_id vào user
+        user.chat_id = chat_id
+        user.save(update_fields=["chat_id"])
 
         # 5️⃣ Trả kết quả
         return JsonResponse(
