@@ -39,6 +39,8 @@ from payments.constants.payment_method import PaymentMethod
 from datetime import datetime, timedelta
 import stripe
 from django.conf import settings
+from cars.constants.car_booking_status import CarBookingStatus
+from cars.models import Car
 
 
 # Phân trang chung cho Booking và RefundPolicy
@@ -130,6 +132,36 @@ class BookingViewSet(viewsets.ModelViewSet):
         elif service_type == ServiceType.CAR:
             car_data = request.data.get("car_detail")
             if car_data:
+                is_many = isinstance(car_data, list)
+                first_car_data = car_data[0] if is_many else car_data
+
+                # car_id lấy từ dict, KHÔNG dùng getattr
+                car_id = first_car_data.get("car")
+                if not car_id:
+                    return Response(
+                        {"isSuccess": False, "message": "No car selected"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                car = Car.objects.select_related("user").filter(id=car_id).first()
+                if not car:
+                    return Response(
+                        {"isSuccess": False, "message": "Car not found"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                driver = car.user
+                if not driver:
+                    return Response(
+                        {"isSuccess": False, "message": "Driver not found"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                if driver.driver_status == "busy":
+                    return Response(
+                        {"isSuccess": False, "message": "Driver is busy"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 car_serializer = CarBookingDetailCreateSerializer(
                     data=car_data, many=isinstance(car_data, list)
                 )
@@ -369,6 +401,13 @@ class BookingViewSet(viewsets.ModelViewSet):
         # Giữ nguyên final_price để audit
         booking.save()
 
+        service_type = booking.service_type
+        if service_type == ServiceType.CAR:
+            driver = getattr(getattr(booking, "car_detail", None), "driver", None)
+            if driver and driver.driver_status == "busy":
+                driver.driver_status = "idle"
+                driver.save(update_fields=["driver_status"])
+
         return Response(
             {
                 "isSuccess": True,
@@ -493,6 +532,16 @@ class BookingViewSet(viewsets.ModelViewSet):
             if old_details.exists():
                 new_details = []
                 for old_detail in old_details:
+                    driver = getattr(old_detail, "driver", None)
+                    if driver and driver.driver_status == "busy":
+                        return Response(
+                            {
+                                "isSuccess": False,
+                                "message": "Driver is busy",
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
                     new_detail = CarBookingDetail.objects.create(
                         booking=new_booking,
                         car=old_detail.car,
@@ -510,7 +559,8 @@ class BookingViewSet(viewsets.ModelViewSet):
                         driver=old_detail.driver,
                         total_price=old_detail.total_price,
                         discount_amount=0.0,  # Reset discount
-                        final_price=old_detail.total_price,  # Tạm thời
+                        final_price=old_detail.total_price,  # Tạm thời,
+                        status=CarBookingStatus.STARTING,
                     )
                     new_details.append(new_detail)
                 new_booking.service_ref_ids = [d.id for d in new_details]
