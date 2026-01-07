@@ -205,6 +205,56 @@ class AircraftListView(generics.ListCreateAPIView):
                 airline__flight_operations_staff_id=flight_operations_staff_id
             )
 
+        model = filter_params.get("model")
+        if model:
+            queryset = queryset.filter(model__icontains=model)
+
+        registration_number = filter_params.get("registration_number")
+        if registration_number:
+            queryset = queryset.filter(
+                registration_number__icontains=registration_number
+            )
+
+        is_active = filter_params.get("is_active")
+        if is_active:
+            queryset = queryset.filter(is_active=is_active)
+
+        manufacture_year = filter_params.get("manufacture_year")
+        if manufacture_year:
+            queryset = queryset.filter(manufacture_year=manufacture_year)
+
+        min_total_seats = filter_params.get("min_total_seats")
+        if min_total_seats:
+            queryset = queryset.filter(total_seats__gte=min_total_seats)
+
+        max_total_seats = filter_params.get("max_total_seats")
+        if max_total_seats:
+            queryset = queryset.filter(total_seats__lte=max_total_seats)
+
+        min_economy_seats = filter_params.get("min_economy_seats")
+        if min_economy_seats:
+            queryset = queryset.filter(economy_seats__gte=min_economy_seats)
+
+        max_economy_seats = filter_params.get("max_economy_seats")
+        if max_economy_seats:
+            queryset = queryset.filter(economy_seats__lte=max_economy_seats)
+
+        min_business_seats = filter_params.get("min_business_seats")
+        if min_business_seats:
+            queryset = queryset.filter(business_seats__gte=min_business_seats)
+
+        max_business_seats = filter_params.get("max_business_seats")
+        if max_business_seats:
+            queryset = queryset.filter(business_seats__lte=max_business_seats)
+
+        min_first_class_seats = filter_params.get("min_first_class_seats")
+        if min_first_class_seats:
+            queryset = queryset.filter(first_class_seats__gte=min_first_class_seats)
+
+        max_first_class_seats = filter_params.get("max_first_class_seats")
+        if max_first_class_seats:
+            queryset = queryset.filter(first_class_seats__lte=max_first_class_seats)
+
         sort_params = filter_params.get("sort")
         order_fields = []
 

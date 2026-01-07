@@ -52,6 +52,8 @@ class HotelPagination(PageNumberPagination):
                 "ownerId",
                 "recommended",
                 "avg_star",
+                "min_avg_star",
+                "max_avg_star",
                 "min_avg_price",
                 "max_avg_price",
                 "sort",
@@ -71,6 +73,22 @@ class HotelPagination(PageNumberPagination):
                     self.filters["avg_star__lt"] = int_value + 1
                 except ValueError:
                     pass
+
+            if field in ["min_avg_star", "max_avg_star"]:
+                min_avg_star = request.query_params.get("min_avg_star")
+                max_avg_star = request.query_params.get("max_avg_star")
+
+                if min_avg_star:
+                    try:
+                        self.filters["avg_star__gte"] = float(min_avg_star)
+                    except ValueError:
+                        pass
+
+                if max_avg_star:
+                    try:
+                        self.filters["avg_star__lte"] = float(max_avg_star)
+                    except ValueError:
+                        pass
 
             if field in ["min_avg_price", "max_avg_price"]:
                 min_avg_price = request.query_params.get("min_avg_price")
@@ -219,6 +237,8 @@ class HotelListView(generics.ListAPIView):
                 "ownerId",
                 "recommended",
                 "avg_star",
+                "min_avg_star",
+                "max_avg_star",
                 "min_avg_price",
                 "max_avg_price",
                 "sort",
@@ -240,6 +260,22 @@ class HotelListView(generics.ListAPIView):
                     )
                 except ValueError:
                     pass  # bỏ qua nếu không phải số hợp lệ
+
+            if field in ["min_avg_star", "max_avg_star"]:
+                min_avg_star = params.get("min_avg_star")
+                max_avg_star = params.get("max_avg_star")
+
+                if min_avg_star:
+                    try:
+                        q_filter &= Q(avg_star__gte=float(min_avg_star))
+                    except ValueError:
+                        pass
+
+                if max_avg_star:
+                    try:
+                        q_filter &= Q(avg_star__lte=float(max_avg_star))
+                    except ValueError:
+                        pass
 
             if field in ["min_avg_price", "max_avg_price"]:
                 min_avg_price = params.get("min_avg_price")
