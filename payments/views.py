@@ -2520,6 +2520,7 @@ class PaymentPagination(PageNumberPagination):
         driver_id = request.query_params.get("driver_id")
         status = request.query_params.get("status")
         hotel_id = request.query_params.get("hotel_id")
+        room_id = request.query_params.get("room_id")
         car_id = request.query_params.get("car_id")
         activity_date_id = request.query_params.get("activity_date_id")
         min_time_checkin_room = request.query_params.get("min_time_checkin_room")
@@ -2570,6 +2571,9 @@ class PaymentPagination(PageNumberPagination):
 
         if hotel_id:
             self.filters["booking__hotel_detail__room__hotel_id"] = hotel_id
+
+        if room_id:
+            self.filters["booking__hotel_detail__room_id"] = room_id
 
         if car_id:
             self.filters["booking__car_detail__car_id"] = car_id
@@ -2652,6 +2656,7 @@ class PaymentPagination(PageNumberPagination):
                 "status",
                 "sort",
                 "hotel_id",
+                "room_id",
                 "car_id",
                 "activity_date_id",
                 "min_time_checkin_room",
@@ -2825,6 +2830,13 @@ class PaymentListView(generics.ListAPIView):
                 booking__service_type=ServiceType.HOTEL,
             )
 
+        room_id = filter_params.get("room_id")
+        if room_id:
+            queryset = queryset.filter(
+                booking__hotel_detail__room_id=room_id,
+                booking__service_type=ServiceType.HOTEL,
+            )
+
         car_id = filter_params.get("car_id")
         if car_id:
             queryset = queryset.filter(
@@ -2969,6 +2981,7 @@ class PaymentListView(generics.ListAPIView):
                 "status",
                 "sort",
                 "hotel_id",
+                "room_id",
                 "car_id",
                 "activity_date_id",
                 "min_time_checkin_room",
@@ -3045,9 +3058,11 @@ class PaymentListOverviewView(generics.ListAPIView):
         flight_operations_staff_id = params.get("flight_operations_staff_id")
         driver_id = params.get("driver_id")
         hotel_id = params.get("hotel_id")
+        room_id = params.get("room_id")
         activity_id = params.get("activity_id")
         car_id = params.get("car_id")
         airline_id = params.get("airline_id")
+        flight_id = params.get("flight_id")
 
         if min_date and max_date:
             queryset = queryset.filter(created_at__range=[min_date, max_date])
@@ -3092,6 +3107,12 @@ class PaymentListOverviewView(generics.ListAPIView):
                 booking__service_type=ServiceType.HOTEL,
             )
 
+        if room_id:
+            queryset = queryset.filter(
+                booking__hotel_detail__room_id=room_id,
+                booking__service_type=ServiceType.HOTEL,
+            )
+
         if activity_id:
             queryset = queryset.filter(
                 booking__activity_date_detail__activity_date__activity_package__activity_id=activity_id,
@@ -3107,6 +3128,12 @@ class PaymentListOverviewView(generics.ListAPIView):
         if airline_id:
             queryset = queryset.filter(
                 booking__flight_details__flight__airline_id=airline_id,
+                booking__service_type=ServiceType.FLIGHT,
+            )
+
+        if flight_id:
+            queryset = queryset.filter(
+                booking__flight_details__flight_id=flight_id,
                 booking__service_type=ServiceType.FLIGHT,
             )
 

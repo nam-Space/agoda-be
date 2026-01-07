@@ -25,10 +25,12 @@ class AirportPagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
 
         for field, value in request.query_params.items():
-            if field not in ["current", "pageSize", "sort", "city_id"]:
+            if field not in ["current", "pageSize", "sort", "city_id", "code"]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
             if field in ["city_id"]:
+                self.filters[f"{field}"] = value
+            if field in ["code"]:
                 self.filters[f"{field}"] = value
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
@@ -84,10 +86,12 @@ class AirportListView(generics.ListAPIView):
         query_filter = Q()
 
         for field, value in filter_params.items():
-            if field not in ["pageSize", "current", "sort", "city_id"]:
+            if field not in ["pageSize", "current", "sort", "city_id", "code"]:
                 query_filter &= Q(**{f"{field}__icontains": value})
 
             if field in ["city_id"]:
+                query_filter &= Q(**{f"{field}": value})
+            if field in ["code"]:
                 query_filter &= Q(**{f"{field}": value})
 
         # Áp dụng lọc cho queryset

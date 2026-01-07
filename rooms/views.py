@@ -174,6 +174,18 @@ class RoomAdminListView(generics.ListAPIView):
         hotel_name = filter_params.get("hotel_name")
         adults = filter_params.get("adults")
         children = filter_params.get("children")
+        room_type = filter_params.get("room_type")
+        description = filter_params.get("description")
+        stay_type = filter_params.get("stay_type")
+        min_price_per_night = filter_params.get("min_price_per_night")
+        max_price_per_night = filter_params.get("max_price_per_night")
+        min_price_per_day = filter_params.get("min_price_per_day")
+        max_price_per_day = filter_params.get("max_price_per_day")
+        min_adults_capacity = filter_params.get("min_adults_capacity")
+        max_adults_capacity = filter_params.get("max_adults_capacity")
+        min_children_capacity = filter_params.get("min_children_capacity")
+        max_children_capacity = filter_params.get("max_children_capacity")
+        available = filter_params.get("available")
 
         if hotel_id:
             queryset = queryset.filter(hotel_id=int(hotel_id))
@@ -189,6 +201,38 @@ class RoomAdminListView(generics.ListAPIView):
 
         if children:
             queryset = queryset.filter(children_capacity__gte=int(children))
+        if room_type:
+            queryset = queryset.filter(room_type__icontains=room_type)
+        if description:
+            queryset = queryset.filter(description__icontains=description)
+        if stay_type:
+            queryset = queryset.filter(stay_type=stay_type)
+        if min_price_per_night:
+            queryset = queryset.filter(
+                price_per_night__gte=min_price_per_night, stay_type="overnight"
+            )
+        if max_price_per_night:
+            queryset = queryset.filter(
+                price_per_night__lte=max_price_per_night, stay_type="overnight"
+            )
+        if min_price_per_day:
+            queryset = queryset.filter(
+                price_per_day__gte=min_price_per_day, stay_type="dayuse"
+            )
+        if max_price_per_day:
+            queryset = queryset.filter(
+                price_per_day__lte=max_price_per_day, stay_type="dayuse"
+            )
+        if min_adults_capacity:
+            queryset = queryset.filter(adults_capacity__gte=min_adults_capacity)
+        if max_adults_capacity:
+            queryset = queryset.filter(adults_capacity__lte=max_adults_capacity)
+        if min_children_capacity:
+            queryset = queryset.filter(children_capacity__gte=min_children_capacity)
+        if max_children_capacity:
+            queryset = queryset.filter(children_capacity__lte=max_children_capacity)
+        if available:
+            queryset = queryset.filter(available=available)
 
         queryset = queryset.prefetch_related(
             Prefetch("images", queryset=RoomImage.objects.all(), to_attr="room_images")

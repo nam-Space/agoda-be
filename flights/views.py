@@ -52,7 +52,10 @@ class FlightListView(generics.ListAPIView):
         query_filter = Q()
 
         # ⭐ Leg cuối là leg có arrival_time lớn nhất
-        queryset = Flight.objects.annotate(last_arrival_time=Max("legs__arrival_time"))
+        queryset = Flight.objects.annotate(
+            first_departure_time=Min("legs__departure_time"),
+            last_arrival_time=Max("legs__arrival_time"),
+        )
 
         # Duyệt qua các tham số query để tạo bộ lọc cho mỗi trường
         for field, value in filter_params.items():
@@ -61,17 +64,29 @@ class FlightListView(generics.ListAPIView):
                 and field != "pageSize"
                 and field != "sort"
                 and field != "airline_id"
+                and field != "aircraft_id"
                 and field != "flight_operations_staff_id"
                 and field != "arrival_city_id"
                 and field != "min_flight_leg_departure"
                 and field != "max_flight_leg_departure"
                 and field != "min_flight_leg_arrival"
                 and field != "max_flight_leg_arrival"
+                and field != "min_total_duration"
+                and field != "max_total_duration"
+                and field != "baggage_included"
+                and field != "min_stops"
+                and field != "max_stops"
+                and field != "min_base_price"
+                and field != "max_base_price"
+                and field != "departure_airport_id"
+                and field != "arrival_airport_id"
             ):
                 query_filter &= Q(
                     **{f"{field}__icontains": value}
                 )  # Thêm điều kiện lọc cho mỗi trường
             if field == "airline_id":
+                query_filter &= Q(**{f"{field}": value})
+            if field == "aircraft_id":
                 query_filter &= Q(**{f"{field}": value})
             if field == "flight_operations_staff_id":
                 query_filter &= Q(**{f"airline__flight_operations_staff_id": value})
@@ -80,6 +95,31 @@ class FlightListView(generics.ListAPIView):
                 query_filter &= Q(
                     legs__arrival_time=F("last_arrival_time"),
                     legs__arrival_airport__city_id=value,
+                )
+            if field == "min_total_duration":
+                query_filter &= Q(**{f"total_duration__gte": value})
+            if field == "max_total_duration":
+                query_filter &= Q(**{f"total_duration__lte": value})
+            if field == "baggage_included":
+                query_filter &= Q(**{f"baggage_included": value})
+            if field == "min_stops":
+                query_filter &= Q(**{f"stops__gte": value})
+            if field == "max_stops":
+                query_filter &= Q(**{f"stops__lte": value})
+            if field == "min_base_price":
+                query_filter &= Q(**{f"base_price__gte": value})
+            if field == "max_base_price":
+                query_filter &= Q(**{f"base_price__lte": value})
+            if field == "departure_airport_id":
+                query_filter &= Q(
+                    legs__departure_time=F("first_departure_time"),
+                    legs__departure_airport_id=value,
+                )
+
+            if field == "arrival_airport_id":
+                query_filter &= Q(
+                    legs__arrival_time=F("last_arrival_time"),
+                    legs__arrival_airport_id=value,
                 )
 
         min_flight_leg_departure = filter_params.get("min_flight_leg_departure")
@@ -115,7 +155,7 @@ class FlightListView(generics.ListAPIView):
                     legs__arrival_time__gt=max_flight_leg_arrival
                 )
 
-        queryset = queryset.filter(query_filter)
+        queryset = queryset.filter(query_filter).distinct()
 
         sort_params = filter_params.get("sort")
         order_fields = []
