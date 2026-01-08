@@ -5,6 +5,7 @@ from accounts.serializers import UserSerializer
 from hotels.models import Hotel
 from django.utils import timezone
 from datetime import timedelta
+from bookings.constants.booking_status import BookingStatus
 
 
 class RoomImageSerializer(serializers.ModelSerializer):
@@ -51,11 +52,11 @@ class RoomCreateSerializer(serializers.ModelSerializer):
         return obj.get_active_promotion() is not None
 
     def create(self, validated_data):
-        if 'start_date' not in validated_data or validated_data['start_date'] is None:
-            validated_data['start_date'] = timezone.now().date()
-        if 'end_date' not in validated_data or validated_data['end_date'] is None:
-            validated_data['end_date'] = timezone.now().date() + timedelta(days=365)
-        
+        if "start_date" not in validated_data or validated_data["start_date"] is None:
+            validated_data["start_date"] = timezone.now().date()
+        if "end_date" not in validated_data or validated_data["end_date"] is None:
+            validated_data["end_date"] = timezone.now().date() + timedelta(days=365)
+
         amenities_data = validated_data.pop("amenities_data", [])
         room = Room.objects.create(**validated_data)
 
@@ -117,13 +118,13 @@ class RoomBookingDetailCreateSerializer(serializers.ModelSerializer):
             "room_type",
             "room_count",
         ]
-    
+
     def validate(self, data):
-        room = data.get('room')
-        check_in = data.get('check_in')
-        check_out = data.get('check_out')
-        num_guests = data.get('num_guests')
-        room_count = data.get('room_count', 1)
+        room = data.get("room")
+        check_in = data.get("check_in")
+        check_out = data.get("check_out")
+        num_guests = data.get("num_guests")
+        room_count = data.get("room_count", 1)
 
         # Validate dates
         if check_in >= check_out:
@@ -133,18 +134,22 @@ class RoomBookingDetailCreateSerializer(serializers.ModelSerializer):
 
         # Validate capacity
         if num_guests > room.capacity:
-            raise serializers.ValidationError(f"Number of guests ({num_guests}) exceeds room capacity ({room.capacity})")
+            raise serializers.ValidationError(
+                f"Number of guests ({num_guests}) exceeds room capacity ({room.capacity})"
+            )
 
         # Validate room_count
         if room_count > room.available_rooms:
-            raise serializers.ValidationError(f"Only {room.available_rooms} rooms available")
+            raise serializers.ValidationError(
+                f"Only {room.available_rooms} rooms available"
+            )
 
         # Validate availability (check overlap với existing bookings)
         overlapping_bookings = RoomBookingDetail.objects.filter(
-            room=room,
-            check_in__lt=check_out,
-            check_out__gt=check_in
-        ).exclude(booking__status__in=['CANCELLED'])  # Loại cancelled
+            room=room, check_in__lt=check_out, check_out__gt=check_in
+        ).exclude(
+            booking__status__in=[BookingStatus.CANCELLED]
+        )  # Loại cancelled
         total_booked_rooms = sum(b.room_count for b in overlapping_bookings)
         if total_booked_rooms + room_count > room.total_rooms:
             raise serializers.ValidationError("Room not available for selected dates")

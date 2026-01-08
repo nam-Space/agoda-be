@@ -41,6 +41,7 @@ import stripe
 from django.conf import settings
 from cars.constants.car_booking_status import CarBookingStatus
 from cars.models import Car
+from activities.models import ActivityDate
 
 
 # Phân trang chung cho Booking và RefundPolicy
@@ -196,6 +197,42 @@ class BookingViewSet(viewsets.ModelViewSet):
         elif service_type == ServiceType.ACTIVITY:
             activity_date_data = request.data.get("activity_date_detail")
             if activity_date_data:
+                is_many = isinstance(activity_date_data, list)
+                first_activity_date_data = (
+                    activity_date_data[0] if is_many else activity_date_data
+                )
+                activity_date_id = first_activity_date_data.get("activity_date")
+                if not activity_date_id:
+                    return Response(
+                        {"isSuccess": False, "message": "No activity date selected"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                activity_date = ActivityDate.objects.filter(id=activity_date_id).first()
+                if not activity_date:
+                    return Response(
+                        {"isSuccess": False, "message": "Activity date not found"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                adult_quantity_booking = first_activity_date_data.get(
+                    "adult_quantity_booking"
+                )
+                child_quantity_booking = first_activity_date_data.get(
+                    "child_quantity_booking"
+                )
+
+                if activity_date.participants_available < int(
+                    str(adult_quantity_booking)
+                ) + int(str(child_quantity_booking)):
+                    return Response(
+                        {
+                            "isSuccess": False,
+                            "message": "Unavailable slot for booking activity date",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
                 activity_date_serializer = ActivityDateBookingCreateSerializer(
                     data=activity_date_data, many=isinstance(activity_date_data, list)
                 )
@@ -402,7 +439,28 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.save()
 
         service_type = booking.service_type
-        if service_type == ServiceType.CAR:
+        if service_type == ServiceType.ACTIVITY:
+            adult_quantity_booking = getattr(
+                getattr(booking, "activity_date_detail", None),
+                "adult_quantity_booking",
+                None,
+            )
+            child_quantity_booking = getattr(
+                getattr(booking, "activity_date_detail", None),
+                "child_quantity_booking",
+                None,
+            )
+            activity_date = getattr(
+                getattr(booking, "activity_date_detail", None), "activity_date", None
+            )
+
+            if adult_quantity_booking and child_quantity_booking and activity_date:
+                activity_date.participants_available += int(
+                    str(adult_quantity_booking)
+                ) + int(str(child_quantity_booking))
+                activity_date.save(update_fields=["participants_available"])
+
+        elif service_type == ServiceType.CAR:
             driver = getattr(getattr(booking, "car_detail", None), "driver", None)
             if driver and driver.driver_status == "busy":
                 driver.driver_status = "idle"

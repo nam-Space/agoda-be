@@ -18,7 +18,7 @@ from payments.constants.payment_method import PaymentMethod
 from bookings.constants.service_type import ServiceType
 from bookings.constants.booking_status import BookingStatus
 from django.db.models.functions import TruncDay, TruncMonth, TruncQuarter, TruncYear
-from django.db.models import Sum, Min, Max
+from django.db.models import Q, Count, Sum, Min, Max, F
 from datetime import timedelta
 from accounts.models import CustomUser
 from django.core.files.storage import default_storage
@@ -2492,12 +2492,13 @@ from rest_framework.response import Response
 import math
 from django.core.paginator import Paginator
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count
 from bookings.models import Booking
 from bookings.constants.booking_status import BookingStatus
 from rest_framework import status
 from .serializers import PaymentCreateSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.db.models import OuterRef, Subquery
+from flights.models import FlightLeg
 
 
 # Phân trang
@@ -2512,7 +2513,16 @@ class PaymentPagination(PageNumberPagination):
         currentPage = request.query_params.get("current")
         booking__service_type = request.query_params.get("booking__service_type")
         booking__service_ref_id = request.query_params.get("booking__service_ref_id")
+        booking__booking_code = request.query_params.get("booking__booking_code")
+        transaction_id = request.query_params.get("transaction_id")
         booking__user_id = request.query_params.get("booking__user_id")
+        method = request.query_params.get("method")
+        min_total_price = request.query_params.get("min_total_price")
+        max_total_price = request.query_params.get("max_total_price")
+        min_discount_amount = request.query_params.get("min_discount_amount")
+        max_discount_amount = request.query_params.get("max_discount_amount")
+        min_final_price = request.query_params.get("min_final_price")
+        max_final_price = request.query_params.get("max_final_price")
         owner_hotel_id = request.query_params.get("owner_hotel_id")
         event_organizer_activity_id = request.query_params.get(
             "event_organizer_activity_id"
@@ -2523,6 +2533,8 @@ class PaymentPagination(PageNumberPagination):
         room_id = request.query_params.get("room_id")
         car_id = request.query_params.get("car_id")
         car_booking_status = request.query_params.get("car_booking_status")
+        activity_id = request.query_params.get("activity_id")
+        activity_package_id = request.query_params.get("activity_package_id")
         activity_date_id = request.query_params.get("activity_date_id")
         min_time_checkin_room = request.query_params.get("min_time_checkin_room")
         max_time_checkin_room = request.query_params.get("max_time_checkin_room")
@@ -2538,6 +2550,7 @@ class PaymentPagination(PageNumberPagination):
         flight_operations_staff_id = request.query_params.get(
             "flight_operations_staff_id"
         )
+        airline_id = request.query_params.get("airline_id")
         flight_id = request.query_params.get("flight_id")
 
         if booking__service_type:
@@ -2546,8 +2559,30 @@ class PaymentPagination(PageNumberPagination):
         if booking__service_ref_id:
             self.filters["booking__service_ref_id"] = booking__service_ref_id
 
+        if booking__booking_code:
+            self.filters["booking__booking_code"] = booking__booking_code
+
+        if transaction_id:
+            self.filters["transaction_id"] = transaction_id
+
         if booking__user_id:
             self.filters["booking__user_id"] = booking__user_id
+
+        if method:
+            self.filters["method"] = method
+
+        if min_total_price:
+            self.filters["booking__total_price__gte"] = min_total_price
+        if max_total_price:
+            self.filters["booking__total_price__lte"] = max_total_price
+        if min_discount_amount:
+            self.filters["booking__discount_amount__gte"] = min_discount_amount
+        if max_discount_amount:
+            self.filters["booking__discount_amount__lte"] = max_discount_amount
+        if min_final_price:
+            self.filters["booking__final_price__gte"] = min_final_price
+        if max_final_price:
+            self.filters["booking__final_price__lte"] = max_final_price
 
         # ✅ Lưu filter theo owner_hotel_id (RoomBookingDetail)
         if owner_hotel_id:
@@ -2581,6 +2616,16 @@ class PaymentPagination(PageNumberPagination):
 
         if car_booking_status:
             self.filters["booking__car_detail__status"] = car_booking_status
+
+        if activity_id:
+            self.filters[
+                "booking__activity_date_detail__activity_date__activity_package__activity_id"
+            ] = activity_id
+
+        if activity_package_id:
+            self.filters[
+                "booking__activity_date_detail__activity_date__activity_package_id"
+            ] = activity_package_id
 
         if activity_date_id:
             self.filters["booking__activity_date_detail__activity_date_id"] = (
@@ -2642,6 +2687,11 @@ class PaymentPagination(PageNumberPagination):
                 "booking__flight_details__flight__airline__flight_operations_staff_id"
             ] = flight_operations_staff_id
 
+        if airline_id:
+            # chỉ áp dụng cho booking có service_type là FLIGHT
+            self.filters["booking__service_type"] = ServiceType.FLIGHT
+            self.filters["booking__flight_details__flight__airline_id"] = airline_id
+
         if flight_id:
             # chỉ áp dụng cho booking có service_type là FLIGHT
             self.filters["booking__service_type"] = ServiceType.FLIGHT
@@ -2653,7 +2703,16 @@ class PaymentPagination(PageNumberPagination):
                 "pageSize",
                 "booking__service_type",
                 "booking__service_ref_id",
+                "booking__booking_code",
+                "transaction_id",
                 "booking__user_id",
+                "method",
+                "min_total_price",
+                "max_total_price",
+                "min_discount_amount",
+                "max_discount_amount",
+                "min_final_price",
+                "max_final_price",
                 "owner_hotel_id",
                 "event_organizer_activity_id",
                 "driver_id",
@@ -2663,6 +2722,8 @@ class PaymentPagination(PageNumberPagination):
                 "room_id",
                 "car_id",
                 "car_booking_status",
+                "activity_id",
+                "activity_package_id",
                 "activity_date_id",
                 "min_time_checkin_room",
                 "max_time_checkin_room",
@@ -2676,6 +2737,7 @@ class PaymentPagination(PageNumberPagination):
                 "min_dropoff_datetime_car",
                 "max_dropoff_datetime_car",
                 "flight_operations_staff_id",
+                "airline_id",
                 "flight_id",
                 "min_flight_leg_departure",
                 "max_flight_leg_departure",
@@ -2782,9 +2844,42 @@ class PaymentListView(generics.ListAPIView):
         if booking__service_ref_id:
             query_filter &= Q(booking__service_ref_id=booking__service_ref_id)
 
+        booking__booking_code = filter_params.get("booking__booking_code")
+        if booking__booking_code:
+            query_filter &= Q(booking__booking_code=booking__booking_code)
+
+        transaction_id = filter_params.get("transaction_id")
+        if transaction_id:
+            query_filter &= Q(transaction_id=transaction_id)
+
         booking__user_id = filter_params.get("booking__user_id")
         if booking__user_id:
             query_filter &= Q(booking__user_id=booking__user_id)
+
+        method = filter_params.get("method")
+        if method:
+            query_filter &= Q(method=method)
+
+        min_total_price = filter_params.get("min_total_price")
+        if min_total_price:
+            query_filter &= Q(booking__total_price__gte=min_total_price)
+        max_total_price = filter_params.get("max_total_price")
+        if max_total_price:
+            query_filter &= Q(booking__total_price__lte=max_total_price)
+
+        min_discount_amount = filter_params.get("min_discount_amount")
+        if min_discount_amount:
+            query_filter &= Q(booking__discount_amount__gte=min_discount_amount)
+        max_discount_amount = filter_params.get("max_discount_amount")
+        if max_discount_amount:
+            query_filter &= Q(booking__discount_amount__lte=max_discount_amount)
+
+        min_final_price = filter_params.get("min_final_price")
+        if min_final_price:
+            query_filter &= Q(booking__final_price__gte=min_final_price)
+        max_final_price = filter_params.get("max_final_price")
+        if max_final_price:
+            query_filter &= Q(booking__final_price__lte=max_final_price)
 
         # --- Lọc theo owner_hotel (truy ngược qua RoomBookingDetail) ---
         owner_hotel_id = filter_params.get("owner_hotel_id")
@@ -2812,6 +2907,13 @@ class PaymentListView(generics.ListAPIView):
         if flight_operations_staff_id:
             query_filter &= Q(
                 booking__flight_details__flight__airline__flight_operations_staff_id=flight_operations_staff_id,
+                booking__service_type=ServiceType.FLIGHT,  # chỉ lọc khi service_type là FLIGHT
+            )
+
+        airline_id = filter_params.get("airline_id")
+        if airline_id:
+            query_filter &= Q(
+                booking__flight_details__flight__airline_id=airline_id,
                 booking__service_type=ServiceType.FLIGHT,  # chỉ lọc khi service_type là FLIGHT
             )
 
@@ -2854,6 +2956,20 @@ class PaymentListView(generics.ListAPIView):
             queryset = queryset.filter(
                 booking__car_detail__status=car_booking_status,
                 booking__service_type=ServiceType.CAR,
+            )
+
+        activity_id = filter_params.get("activity_id")
+        if activity_id:
+            queryset = queryset.filter(
+                booking__activity_date_detail__activity_date__activity_package__activity_id=activity_id,
+                booking__service_type=ServiceType.ACTIVITY,
+            )
+
+        activity_package_id = filter_params.get("activity_package_id")
+        if activity_package_id:
+            queryset = queryset.filter(
+                booking__activity_date_detail__activity_date__activity_package_id=activity_package_id,
+                booking__service_type=ServiceType.ACTIVITY,
             )
 
         activity_date_id = filter_params.get("activity_date_id")
@@ -2986,7 +3102,16 @@ class PaymentListView(generics.ListAPIView):
                 "current",
                 "booking__service_type",
                 "booking__service_ref_id",
+                "booking__booking_code",
+                "transaction_id",
                 "booking__user_id",
+                "method",
+                "min_total_price",
+                "max_total_price",
+                "min_discount_amount",
+                "max_discount_amount",
+                "min_final_price",
+                "max_final_price",
                 "owner_hotel_id",
                 "event_organizer_activity_id",
                 "driver_id",
@@ -2996,6 +3121,8 @@ class PaymentListView(generics.ListAPIView):
                 "room_id",
                 "car_id",
                 "car_booking_status",
+                "activity_id",
+                "activity_package_id",
                 "activity_date_id",
                 "min_time_checkin_room",
                 "max_time_checkin_room",
@@ -3008,6 +3135,7 @@ class PaymentListView(generics.ListAPIView):
                 "min_dropoff_datetime_car",
                 "max_dropoff_datetime_car",
                 "flight_operations_staff_id",
+                "airline_id",
                 "flight_id",
                 "date_launch_activity",
                 "min_flight_leg_departure",

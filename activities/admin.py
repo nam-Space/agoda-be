@@ -39,8 +39,8 @@ class ActivityDateAdmin(admin.ModelAdmin):
         "activity_package",
         "price_adult",
         "price_child",
-        "adult_quantity",
-        "child_quantity",
+        "max_participants",
+        "participants_available",
         "date_launch",
     )
     search_fields = "date_launch", "activity_package__name"

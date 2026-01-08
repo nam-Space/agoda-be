@@ -148,8 +148,8 @@ class ActivityDate(models.Model):
     )
     price_adult = models.FloatField(default=0.0)
     price_child = models.FloatField(default=0.0)
-    adult_quantity = models.PositiveIntegerField(default=1)
-    child_quantity = models.PositiveIntegerField(default=1)
+    max_participants = models.PositiveIntegerField(default=300)
+    participants_available = models.PositiveIntegerField(default=300)
     date_launch = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -245,6 +245,14 @@ class ActivityDateBookingDetail(models.Model):
         self.total_price = (self.price_adult or 0) * (
             self.adult_quantity_booking or 0
         ) + (self.price_child or 0) * (self.child_quantity_booking or 0)
+
+        activity_date = self.activity_date
+        if activity_date:
+            activity_date.participants_available = (
+                activity_date.participants_available
+                - (self.adult_quantity_booking + self.child_quantity_booking)
+            )
+            activity_date.save(update_fields=["participants_available"])
 
         # Lấy promotion từ ActivityDate (chỉ áp dụng promotion cho ActivityDate)
         promo = None
