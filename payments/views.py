@@ -2522,6 +2522,7 @@ class PaymentPagination(PageNumberPagination):
         hotel_id = request.query_params.get("hotel_id")
         room_id = request.query_params.get("room_id")
         car_id = request.query_params.get("car_id")
+        car_booking_status = request.query_params.get("car_booking_status")
         activity_date_id = request.query_params.get("activity_date_id")
         min_time_checkin_room = request.query_params.get("min_time_checkin_room")
         max_time_checkin_room = request.query_params.get("max_time_checkin_room")
@@ -2577,6 +2578,9 @@ class PaymentPagination(PageNumberPagination):
 
         if car_id:
             self.filters["booking__car_detail__car_id"] = car_id
+
+        if car_booking_status:
+            self.filters["booking__car_detail__status"] = car_booking_status
 
         if activity_date_id:
             self.filters["booking__activity_date_detail__activity_date_id"] = (
@@ -2658,6 +2662,7 @@ class PaymentPagination(PageNumberPagination):
                 "hotel_id",
                 "room_id",
                 "car_id",
+                "car_booking_status",
                 "activity_date_id",
                 "min_time_checkin_room",
                 "max_time_checkin_room",
@@ -2844,6 +2849,13 @@ class PaymentListView(generics.ListAPIView):
                 booking__service_type=ServiceType.CAR,
             )
 
+        car_booking_status = filter_params.get("car_booking_status")
+        if car_booking_status:
+            queryset = queryset.filter(
+                booking__car_detail__status=car_booking_status,
+                booking__service_type=ServiceType.CAR,
+            )
+
         activity_date_id = filter_params.get("activity_date_id")
         if activity_date_id:
             queryset = queryset.filter(
@@ -2983,6 +2995,7 @@ class PaymentListView(generics.ListAPIView):
                 "hotel_id",
                 "room_id",
                 "car_id",
+                "car_booking_status",
                 "activity_date_id",
                 "min_time_checkin_room",
                 "max_time_checkin_room",
