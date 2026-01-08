@@ -70,6 +70,8 @@ class ActivityPagination(PageNumberPagination):
                 "event_organizer_id",
                 "recommended",
                 "avg_star",
+                "min_avg_star",
+                "max_avg_star",
                 "min_avg_price",
                 "max_avg_price",
                 "sort",
@@ -85,6 +87,22 @@ class ActivityPagination(PageNumberPagination):
                     self.filters["avg_star__lt"] = int_value + 1
                 except ValueError:
                     pass
+
+            if field in ["min_avg_star", "max_avg_star"]:
+                min_avg_star = request.query_params.get("min_avg_star")
+                max_avg_star = request.query_params.get("max_avg_star")
+
+                if min_avg_star:
+                    try:
+                        self.filters["avg_star__gte"] = float(min_avg_star)
+                    except ValueError:
+                        pass
+
+                if max_avg_star:
+                    try:
+                        self.filters["avg_star__lte"] = float(max_avg_star)
+                    except ValueError:
+                        pass
 
             if field in ["min_avg_price", "max_avg_price"]:
                 min_avg_price = request.query_params.get("min_avg_price")
@@ -189,6 +207,8 @@ class ActivityListView(generics.ListAPIView):
                 "event_organizer_id",
                 "recommended",
                 "avg_star",
+                "min_avg_star",
+                "max_avg_star",
                 "min_avg_price",
                 "max_avg_price",
                 "sort",
@@ -205,6 +225,22 @@ class ActivityListView(generics.ListAPIView):
                     )
                 except ValueError:
                     pass  # bỏ qua nếu không phải số hợp lệ
+
+            if field in ["min_avg_star", "max_avg_star"]:
+                min_avg_star = filter_params.get("min_avg_star")
+                max_avg_star = filter_params.get("max_avg_star")
+
+                if min_avg_star:
+                    try:
+                        query_filter &= Q(avg_star__gte=float(min_avg_star))
+                    except ValueError:
+                        pass
+
+                if max_avg_star:
+                    try:
+                        query_filter &= Q(avg_star__lte=float(max_avg_star))
+                    except ValueError:
+                        pass
 
             if field in ["min_avg_price", "max_avg_price"]:
                 min_avg_price = filter_params.get("min_avg_price")
@@ -895,7 +931,15 @@ class ActivityDatePagination(PageNumberPagination):
                 "activity_package_id",
                 "min_date_launch",
                 "max_date_launch",
+                "min_price_adult",
+                "max_price_adult",
+                "min_price_child",
+                "max_price_child",
                 "date_launch",
+                "min_max_participants",
+                "max_max_participants",
+                "min_participants_available",
+                "max_participants_available",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
                 self.filters[f"{field}__icontains"] = value
@@ -928,6 +972,42 @@ class ActivityDatePagination(PageNumberPagination):
                 "date_launch",
             ]:
                 self.filters["date_launch__date"] = value
+            if field in [
+                "min_price_adult",
+            ]:
+                self.filters["price_adult__gte"] = value
+
+            if field in [
+                "max_price_adult",
+            ]:
+                self.filters["price_adult__lte"] = value
+            if field in [
+                "min_price_child",
+            ]:
+                self.filters["price_child__gte"] = value
+
+            if field in [
+                "max_price_child",
+            ]:
+                self.filters["price_child__lte"] = value
+            if field in [
+                "min_max_participants",
+            ]:
+                self.filters["max_participants__gte"] = value
+
+            if field in [
+                "max_max_participants",
+            ]:
+                self.filters["max_participants__lte"] = value
+            if field in [
+                "min_participants_available",
+            ]:
+                self.filters["participants_available__gte"] = value
+
+            if field in [
+                "max_participants_available",
+            ]:
+                self.filters["participants_available__lte"] = value
 
         # Nếu không có hoặc giá trị không hợp lệ, dùng giá trị mặc định
         try:
@@ -991,6 +1071,14 @@ class ActivityDateListView(generics.ListAPIView):
                 "sort",
                 "min_date_launch",
                 "max_date_launch",
+                "min_price_adult",
+                "max_price_adult",
+                "min_price_child",
+                "max_price_child",
+                "min_max_participants",
+                "max_max_participants",
+                "min_participants_available",
+                "max_participants_available",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})
 
@@ -1015,6 +1103,24 @@ class ActivityDateListView(generics.ListAPIView):
             queryset = queryset.filter(date_launch__lte=max_date_launch)
         if date_launch:
             queryset = queryset.filter(date_launch__date=date_launch)
+
+        min_max_participants = filter_params.get("min_max_participants")
+        max_max_participants = filter_params.get("max_max_participants")
+        if min_max_participants:
+            queryset = queryset.filter(max_participants__gte=min_max_participants)
+        if max_max_participants:
+            queryset = queryset.filter(max_participants__lte=max_max_participants)
+
+        min_participants_available = filter_params.get("min_participants_available")
+        max_participants_available = filter_params.get("max_participants_available")
+        if min_participants_available:
+            queryset = queryset.filter(
+                participants_available__gte=min_participants_available
+            )
+        if max_participants_available:
+            queryset = queryset.filter(
+                participants_available__lte=max_participants_available
+            )
 
         # Áp dụng lọc cho queryset
         queryset = queryset.filter(query_filter)
@@ -1131,8 +1237,8 @@ class ActivityDateBulkCreateView(APIView):
         activity_package_id = request.data.get("activity_package")
         price_adult = request.data.get("price_adult")
         price_child = request.data.get("price_child")
-        adult_quantity = request.data.get("adult_quantity")
-        child_quantity = request.data.get("child_quantity")
+        max_participants = request.data.get("max_participants")
+        participants_available = request.data.get("participants_available")
         dates = request.data.get("dates", [])
 
         if not activity_package_id or not dates:
@@ -1151,8 +1257,8 @@ class ActivityDateBulkCreateView(APIView):
                 activity_package_id=activity_package_id,
                 price_adult=price_adult,
                 price_child=price_child,
-                adult_quantity=adult_quantity,
-                child_quantity=child_quantity,
+                max_participants=max_participants,
+                participants_available=participants_available,
                 date_launch=date_str,  # date_str phải đúng format datetime
             )
             created_dates.append(ActivityDateCreateSerializer(activity_date).data)

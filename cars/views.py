@@ -39,6 +39,16 @@ class CarPagination(PageNumberPagination):
         user_id = request.query_params.get("user_id")
         driver_status = request.query_params.get("driver_status")
         driver_area_name = request.query_params.get("driver_area_name")
+        min_avg_star = request.query_params.get("min_avg_star")
+        max_avg_star = request.query_params.get("max_avg_star")
+        min_price_per_km = request.query_params.get("min_price_per_km")
+        max_price_per_km = request.query_params.get("max_price_per_km")
+        min_avg_speed = request.query_params.get("min_avg_speed")
+        max_avg_speed = request.query_params.get("max_avg_speed")
+        min_capacity = request.query_params.get("min_capacity")
+        max_capacity = request.query_params.get("max_capacity")
+        min_luggage = request.query_params.get("min_luggage")
+        max_luggage = request.query_params.get("max_luggage")
 
         if user_id:
             self.filters["user_id"] = user_id
@@ -49,6 +59,31 @@ class CarPagination(PageNumberPagination):
             normalized_name = re.sub(r"\s+", " ", driver_area_name.strip())
             self.filters["user__driver_area__name__icontains"] = normalized_name
 
+        if min_avg_star:
+            self.filters["avg_star__gte"] = min_avg_star
+        if max_avg_star:
+            self.filters["avg_star__lte"] = max_avg_star
+
+        if min_price_per_km:
+            self.filters["price_per_km__gte"] = min_price_per_km
+        if max_price_per_km:
+            self.filters["price_per_km__lte"] = max_price_per_km
+
+        if min_avg_speed:
+            self.filters["avg_speed__gte"] = min_avg_speed
+        if max_avg_speed:
+            self.filters["avg_speed__lte"] = max_avg_speed
+
+        if min_capacity:
+            self.filters["capacity__gte"] = min_capacity
+        if max_capacity:
+            self.filters["capacity__lte"] = max_capacity
+
+        if min_luggage:
+            self.filters["luggage__gte"] = min_luggage
+        if max_luggage:
+            self.filters["luggage__lte"] = max_luggage
+
         for field, value in request.query_params.items():
             if field not in [
                 "current",
@@ -57,6 +92,16 @@ class CarPagination(PageNumberPagination):
                 "driver_status",
                 "driver_area_name",
                 "recommended",
+                "min_avg_star",
+                "max_avg_star",
+                "min_price_per_km",
+                "max_price_per_km",
+                "min_avg_speed",
+                "max_avg_speed",
+                "min_capacity",
+                "max_capacity",
+                "min_luggage",
+                "max_luggage",
                 "sort",
             ]:
                 # có thể dùng __icontains nếu muốn LIKE, hoặc để nguyên nếu so sánh bằng
@@ -134,6 +179,46 @@ class CarListView(generics.ListAPIView):
                 user__driver_area__name__icontains=normalized_name
             )
 
+        min_avg_star = filter_params.get("min_avg_star")
+        if min_avg_star:
+            queryset = queryset.filter(avg_star__gte=min_avg_star)
+
+        max_avg_star = filter_params.get("max_avg_star")
+        if max_avg_star:
+            queryset = queryset.filter(avg_star__lte=max_avg_star)
+
+        min_price_per_km = filter_params.get("min_price_per_km")
+        if min_price_per_km:
+            queryset = queryset.filter(price_per_km__gte=min_price_per_km)
+
+        max_price_per_km = filter_params.get("max_price_per_km")
+        if max_price_per_km:
+            queryset = queryset.filter(price_per_km__lte=max_price_per_km)
+
+        min_avg_speed = filter_params.get("min_avg_speed")
+        if min_avg_speed:
+            queryset = queryset.filter(avg_speed__gte=min_avg_speed)
+
+        max_avg_speed = filter_params.get("max_avg_speed")
+        if max_avg_speed:
+            queryset = queryset.filter(avg_speed__lte=max_avg_speed)
+
+        min_capacity = filter_params.get("min_capacity")
+        if min_capacity:
+            queryset = queryset.filter(capacity__gte=min_capacity)
+
+        max_capacity = filter_params.get("max_capacity")
+        if max_capacity:
+            queryset = queryset.filter(capacity__lte=max_capacity)
+
+        min_luggage = filter_params.get("min_luggage")
+        if min_luggage:
+            queryset = queryset.filter(luggage__gte=min_luggage)
+
+        max_luggage = filter_params.get("max_luggage")
+        if max_luggage:
+            queryset = queryset.filter(luggage__lte=max_luggage)
+
         query_filter = Q()
 
         for field, value in filter_params.items():
@@ -144,6 +229,16 @@ class CarListView(generics.ListAPIView):
                 "driver_status",
                 "driver_area_name",
                 "recommended",
+                "min_avg_star",
+                "max_avg_star",
+                "min_price_per_km",
+                "max_price_per_km",
+                "min_avg_speed",
+                "max_avg_speed",
+                "min_capacity",
+                "max_capacity",
+                "min_luggage",
+                "max_luggage",
                 "sort",
             ]:  # Bỏ qua các trường phân trang
                 query_filter &= Q(**{f"{field}__icontains": value})

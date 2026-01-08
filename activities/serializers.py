@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from .models import (
     Activity,
@@ -11,6 +12,7 @@ from cities.models import City
 from cities.serializers import CityCreateSerializer
 from accounts.serializers import UserSerializer
 from accounts.models import CustomUser
+from bookings.constants.booking_status import BookingStatus
 
 
 class ActivitySimpleSerializer(serializers.ModelSerializer):
@@ -234,8 +236,8 @@ class ActivityDateCreateSerializer(serializers.ModelSerializer):
             "activity_package",
             "price_adult",
             "price_child",
-            "adult_quantity",
-            "child_quantity",
+            "max_participants",
+            "participants_available",
             "date_launch",
             "created_at",
             "updated_at",
@@ -304,3 +306,38 @@ class ActivityDateBookingCreateSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]  # Chỉ có những trường cần thiết
+
+    def validate(self, data):
+        activity_date = data.get("activity_date")
+        adult_qty = data.get("adult_quantity_booking", 0)
+        child_qty = data.get("child_quantity_booking", 0)
+        date_launch = data.get("date_launch")
+
+        # Validate date
+        if date_launch < timezone.now():
+            raise serializers.ValidationError("Activity date cannot be in the past")
+
+        # Validate capacity (nếu ActivityDate có max_participants)
+        total_qty = adult_qty + child_qty
+        if (
+            hasattr(activity_date, "max_participants")
+            and total_qty > activity_date.max_participants
+        ):
+            raise serializers.ValidationError(
+                f"Total participants ({total_qty}) exceed capacity"
+            )
+
+        # Validate availability (check existing bookings)
+        existing_bookings = ActivityDateBookingDetail.objects.filter(
+            activity_date=activity_date, date_launch=date_launch
+        ).exclude(booking__status__in=[BookingStatus.CANCELLED])
+        total_booked = sum(
+            b.adult_quantity_booking + b.child_quantity_booking
+            for b in existing_bookings
+        )
+        if total_booked + total_qty > (activity_date.max_participants or float("inf")):
+            raise serializers.ValidationError(
+                "Activity not available for selected date"
+            )
+
+        return data
