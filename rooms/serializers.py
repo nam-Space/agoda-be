@@ -117,3 +117,36 @@ class RoomBookingDetailCreateSerializer(serializers.ModelSerializer):
             "room_type",
             "room_count",
         ]
+    
+    def validate(self, data):
+        room = data.get('room')
+        check_in = data.get('check_in')
+        check_out = data.get('check_out')
+        num_guests = data.get('num_guests')
+        room_count = data.get('room_count', 1)
+
+        # Validate dates
+        if check_in >= check_out:
+            raise serializers.ValidationError("Check-out must be after check-in")
+        if check_in < timezone.now():
+            raise serializers.ValidationError("Check-in cannot be in the past")
+
+        # Validate capacity
+        if num_guests > room.capacity:
+            raise serializers.ValidationError(f"Number of guests ({num_guests}) exceeds room capacity ({room.capacity})")
+
+        # Validate room_count
+        if room_count > room.available_rooms:
+            raise serializers.ValidationError(f"Only {room.available_rooms} rooms available")
+
+        # Validate availability (check overlap với existing bookings)
+        overlapping_bookings = RoomBookingDetail.objects.filter(
+            room=room,
+            check_in__lt=check_out,
+            check_out__gt=check_in
+        ).exclude(booking__status__in=['CANCELLED'])  # Loại cancelled
+        total_booked_rooms = sum(b.room_count for b in overlapping_bookings)
+        if total_booked_rooms + room_count > room.total_rooms:
+            raise serializers.ValidationError("Room not available for selected dates")
+
+        return data

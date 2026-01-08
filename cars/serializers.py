@@ -1,3 +1,4 @@
+from time import timezone
 from rest_framework import serializers
 from .models import Car, CarBookingDetail, UserCarInteraction
 from accounts.serializers import UserSerializer
@@ -98,6 +99,26 @@ class CarBookingDetailCreateSerializer(serializers.ModelSerializer):
             "passenger_quantity_booking",
             "status",
         ]
+    
+    def validate(self, data):
+        car = data.get('car')
+        pickup_datetime = data.get('pickup_datetime')
+        passenger_quantity = data.get('passenger_quantity_booking', 1)
+
+        # Validate datetime
+        if pickup_datetime < timezone.now():
+            raise serializers.ValidationError("Pickup time cannot be in the past")
+
+        # Validate capacity
+        if passenger_quantity > car.capacity:
+            raise serializers.ValidationError(f"Passenger quantity ({passenger_quantity}) exceeds car capacity ({car.capacity})")
+
+        # Validate driver (đã có trong view, nhưng có thể duplicate ở đây)
+        driver = car.user
+        if not driver or driver.driver_status == 'busy':
+            raise serializers.ValidationError("Driver not available")
+
+        return data
 
 
 class CarBookingUpdateSerializer(serializers.ModelSerializer):
