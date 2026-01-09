@@ -2540,6 +2540,8 @@ class PaymentPagination(PageNumberPagination):
         max_time_checkin_room = request.query_params.get("max_time_checkin_room")
         min_time_checkout_room = request.query_params.get("min_time_checkout_room")
         max_time_checkout_room = request.query_params.get("max_time_checkout_room")
+        min_created_at = request.query_params.get("min_created_at")
+        max_created_at = request.query_params.get("max_created_at")
         min_date_launch_activity = request.query_params.get("min_date_launch_activity")
         max_date_launch_activity = request.query_params.get("max_date_launch_activity")
         date_launch_activity = request.query_params.get("date_launch_activity")
@@ -2551,6 +2553,7 @@ class PaymentPagination(PageNumberPagination):
             "flight_operations_staff_id"
         )
         airline_id = request.query_params.get("airline_id")
+        aircraft_id = request.query_params.get("aircraft_id")
         flight_id = request.query_params.get("flight_id")
 
         if booking__service_type:
@@ -2646,6 +2649,11 @@ class PaymentPagination(PageNumberPagination):
                 max_time_checkout_room
             )
 
+        if min_created_at:
+            self.filters["created_at__gte"] = min_created_at
+        if max_created_at:
+            self.filters["created_at__lte"] = max_created_at
+
         if min_date_launch_activity:
             self.filters["booking__activity_date_detail__date_launch__gte"] = (
                 min_date_launch_activity
@@ -2692,6 +2700,11 @@ class PaymentPagination(PageNumberPagination):
             self.filters["booking__service_type"] = ServiceType.FLIGHT
             self.filters["booking__flight_details__flight__airline_id"] = airline_id
 
+        if aircraft_id:
+            # chỉ áp dụng cho booking có service_type là FLIGHT
+            self.filters["booking__service_type"] = ServiceType.FLIGHT
+            self.filters["booking__flight_details__flight__aircraft_id"] = aircraft_id
+
         if flight_id:
             # chỉ áp dụng cho booking có service_type là FLIGHT
             self.filters["booking__service_type"] = ServiceType.FLIGHT
@@ -2729,6 +2742,8 @@ class PaymentPagination(PageNumberPagination):
                 "max_time_checkin_room",
                 "min_time_checkout_room",
                 "max_time_checkout_room",
+                "min_created_at",
+                "max_created_at",
                 "min_date_launch_activity",
                 "max_date_launch_activity",
                 "date_launch_activity",
@@ -2738,6 +2753,7 @@ class PaymentPagination(PageNumberPagination):
                 "max_dropoff_datetime_car",
                 "flight_operations_staff_id",
                 "airline_id",
+                "aircraft_id",
                 "flight_id",
                 "min_flight_leg_departure",
                 "max_flight_leg_departure",
@@ -2917,6 +2933,13 @@ class PaymentListView(generics.ListAPIView):
                 booking__service_type=ServiceType.FLIGHT,  # chỉ lọc khi service_type là FLIGHT
             )
 
+        aircraft_id = filter_params.get("aircraft_id")
+        if aircraft_id:
+            query_filter &= Q(
+                booking__flight_details__flight__aircraft_id=aircraft_id,
+                booking__service_type=ServiceType.FLIGHT,  # chỉ lọc khi service_type là FLIGHT
+            )
+
         flight_id = filter_params.get("flight_id")
         if flight_id:
             query_filter &= Q(
@@ -3019,6 +3042,22 @@ class PaymentListView(generics.ListAPIView):
                 booking__hotel_detail__check_out__lte=max_time_checkout_room
             )
 
+        min_created_at = filter_params.get("min_created_at")
+        max_created_at = filter_params.get("max_created_at")
+
+        # 🔹 Lọc theo khoảng thời gian checkout phòng (từ - đến)
+        if min_created_at and max_created_at:
+            queryset = queryset.filter(
+                created_at__range=[
+                    min_created_at,
+                    max_created_at,
+                ]
+            )
+        elif min_created_at:
+            queryset = queryset.filter(created_at__gte=min_created_at)
+        elif max_created_at:
+            queryset = queryset.filter(created_at__lte=max_created_at)
+
         min_date_launch_activity = filter_params.get("min_date_launch_activity")
         max_date_launch_activity = filter_params.get("max_date_launch_activity")
 
@@ -3104,6 +3143,8 @@ class PaymentListView(generics.ListAPIView):
                 "booking__service_ref_id",
                 "booking__booking_code",
                 "transaction_id",
+                "min_created_at",
+                "max_created_at",
                 "booking__user_id",
                 "method",
                 "min_total_price",
@@ -3136,6 +3177,7 @@ class PaymentListView(generics.ListAPIView):
                 "max_dropoff_datetime_car",
                 "flight_operations_staff_id",
                 "airline_id",
+                "aircraft_id",
                 "flight_id",
                 "date_launch_activity",
                 "min_flight_leg_departure",
@@ -3201,8 +3243,11 @@ class PaymentListOverviewView(generics.ListAPIView):
         hotel_id = params.get("hotel_id")
         room_id = params.get("room_id")
         activity_id = params.get("activity_id")
+        activity_package_id = params.get("activity_package_id")
+        activity_date_id = params.get("activity_date_id")
         car_id = params.get("car_id")
         airline_id = params.get("airline_id")
+        aircraft_id = params.get("aircraft_id")
         flight_id = params.get("flight_id")
 
         if min_date and max_date:
@@ -3260,6 +3305,18 @@ class PaymentListOverviewView(generics.ListAPIView):
                 booking__service_type=ServiceType.ACTIVITY,
             )
 
+        if activity_package_id:
+            queryset = queryset.filter(
+                booking__activity_date_detail__activity_date__activity_package_id=activity_package_id,
+                booking__service_type=ServiceType.ACTIVITY,
+            )
+
+        if activity_date_id:
+            queryset = queryset.filter(
+                booking__activity_date_detail__activity_date_id=activity_date_id,
+                booking__service_type=ServiceType.ACTIVITY,
+            )
+
         if car_id:
             queryset = queryset.filter(
                 booking__car_detail__car_id=car_id,
@@ -3269,6 +3326,12 @@ class PaymentListOverviewView(generics.ListAPIView):
         if airline_id:
             queryset = queryset.filter(
                 booking__flight_details__flight__airline_id=airline_id,
+                booking__service_type=ServiceType.FLIGHT,
+            )
+
+        if aircraft_id:
+            queryset = queryset.filter(
+                booking__flight_details__flight__aircraft_id=aircraft_id,
                 booking__service_type=ServiceType.FLIGHT,
             )
 

@@ -402,12 +402,14 @@ class PromotionCreateView(generics.CreateAPIView):
                     room = Room.objects.get(id=room_data["id"], hotel=hotel)
                     discount_percent = (
                         room_data["discount_percent"]
-                        if "discount_percent" in room_data and room_data["discount_percent"] is not None
+                        if "discount_percent" in room_data
+                        and room_data["discount_percent"] is not None
                         else promotion.discount_percent
                     )
                     discount_amount = (
                         room_data["discount_amount"]
-                        if "discount_amount" in room_data and room_data["discount_amount"] is not None
+                        if "discount_amount" in room_data
+                        and room_data["discount_amount"] is not None
                         else promotion.discount_amount
                     )
                     room_promotion = RoomPromotion.objects.create(
@@ -455,12 +457,14 @@ class PromotionCreateView(generics.CreateAPIView):
                     flight = Flight.objects.get(id=flight_data["id"])
                     discount_percent = (
                         flight_data["discount_percent"]
-                        if "discount_percent" in flight_data and flight_data["discount_percent"] is not None
+                        if "discount_percent" in flight_data
+                        and flight_data["discount_percent"] is not None
                         else promotion.discount_percent
                     )
                     discount_amount = (
                         flight_data["discount_amount"]
-                        if "discount_amount" in flight_data and flight_data["discount_amount"] is not None
+                        if "discount_amount" in flight_data
+                        and flight_data["discount_amount"] is not None
                         else promotion.discount_amount
                     )
                     flight_promotion = FlightPromotion.objects.create(
@@ -511,12 +515,14 @@ class PromotionCreateView(generics.CreateAPIView):
                         activity_date = ActivityDate.objects.get(id=act_date_data["id"])
                         discount_percent = (
                             act_date_data["discount_percent"]
-                            if "discount_percent" in act_date_data and act_date_data["discount_percent"] is not None
+                            if "discount_percent" in act_date_data
+                            and act_date_data["discount_percent"] is not None
                             else promotion.discount_percent
                         )
                         discount_amount = (
                             act_date_data["discount_amount"]
-                            if "discount_amount" in act_date_data and act_date_data["discount_amount"] is not None
+                            if "discount_amount" in act_date_data
+                            and act_date_data["discount_amount"] is not None
                             else promotion.discount_amount
                         )
                         activity_promotion = ActivityPromotion.objects.create(
@@ -568,12 +574,14 @@ class PromotionCreateView(generics.CreateAPIView):
                     car = Car.objects.get(id=car_data["id"])
                     discount_percent = (
                         car_data["discount_percent"]
-                        if "discount_percent" in car_data and car_data["discount_percent"] is not None
+                        if "discount_percent" in car_data
+                        and car_data["discount_percent"] is not None
                         else promotion.discount_percent
                     )
                     discount_amount = (
                         car_data["discount_amount"]
-                        if "discount_amount" in car_data and car_data["discount_amount"] is not None
+                        if "discount_amount" in car_data
+                        and car_data["discount_amount"] is not None
                         else promotion.discount_amount
                     )
                     car_promotion = CarPromotion.objects.create(
@@ -661,6 +669,50 @@ class PromotionListAdminView(generics.ListCreateAPIView):
         promotion_type = params.get("promotion_type")
         if promotion_type:
             queryset = queryset.filter(promotion_type=promotion_type)
+
+        title = params.get("title")
+        if title:
+            queryset = queryset.filter(title__icontains=title)
+
+        description = params.get("description")
+        if description:
+            queryset = queryset.filter(description__icontains=description)
+
+        min_discount_percent = params.get("min_discount_percent")
+        if min_discount_percent:
+            queryset = queryset.filter(discount_percent__gte=min_discount_percent)
+
+        max_discount_percent = params.get("max_discount_percent")
+        if max_discount_percent:
+            queryset = queryset.filter(discount_percent__lte=max_discount_percent)
+
+        min_discount_amount = params.get("min_discount_amount")
+        if min_discount_amount:
+            queryset = queryset.filter(discount_amount__gte=min_discount_amount)
+
+        max_discount_amount = params.get("max_discount_amount")
+        if max_discount_amount:
+            queryset = queryset.filter(discount_amount__lte=max_discount_amount)
+
+        min_start_date = params.get("min_start_date")
+        if min_start_date:
+            queryset = queryset.filter(start_date__gte=min_start_date)
+
+        max_start_date = params.get("max_start_date")
+        if max_start_date:
+            queryset = queryset.filter(start_date__lte=max_start_date)
+
+        min_end_date = params.get("min_end_date")
+        if min_end_date:
+            queryset = queryset.filter(end_date__gte=min_end_date)
+
+        max_end_date = params.get("max_end_date")
+        if max_end_date:
+            queryset = queryset.filter(end_date__lte=max_end_date)
+
+        is_active = params.get("is_active")
+        if is_active:
+            queryset = queryset.filter(is_active=is_active)
 
         sort_params = params.get("sort")
         order_fields = []
