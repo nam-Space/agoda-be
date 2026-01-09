@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from time import timezone
+from django.utils import timezone
 from .models import Flight, FlightLeg, FlightBookingDetail, SeatClassPricing
 from airports.models import Airport
 from airports.serializers import AirportSerializer
@@ -282,21 +282,25 @@ class FlightBookingDetailCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        flight = data.get('flight')
-        seat_class = data.get('seat_class')
-        num_passengers = data.get('num_passengers')
+        flight = data.get("flight")
+        seat_class = data.get("seat_class")
+        num_passengers = data.get("num_passengers")
 
         # Validate seat_class exists
         seat_class_pricing = flight.seat_classes.filter(seat_class=seat_class).first()
         if not seat_class_pricing:
-            raise serializers.ValidationError(f"Seat class '{seat_class}' not available for this flight")
+            raise serializers.ValidationError(
+                f"Seat class '{seat_class}' not available for this flight"
+            )
 
         # Validate availability
         if num_passengers > seat_class_pricing.available_seats:
-            raise serializers.ValidationError(f"Only {seat_class_pricing.available_seats} seats available in {seat_class}")
+            raise serializers.ValidationError(
+                f"Only {seat_class_pricing.available_seats} seats available in {seat_class}"
+            )
 
         # Validate departure_time > now (từ flight.legs)
-        first_leg = flight.legs.order_by('departure_time').first()
+        first_leg = flight.legs.order_by("departure_time").first()
         if first_leg and first_leg.departure_time < timezone.now():
             raise serializers.ValidationError("Flight departure time is in the past")
 
