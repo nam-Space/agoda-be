@@ -153,6 +153,35 @@ class SeatClassPricing(models.Model):
         return self.capacity - self.available_seats
 
 
+class FlightSeat(models.Model):
+    """
+    Ghế cụ thể trên một chuyến bay + hạng ghế.
+    Ví dụ: 12A (economy), 2C (business).
+    """
+
+    flight = models.ForeignKey(
+        Flight, on_delete=models.CASCADE, related_name="seats"
+    )
+    seat_class = models.CharField(
+        max_length=20, choices=SeatClassPricing.FLIGHT_CLASSES, default="economy"
+    )
+    seat_number = models.CharField(max_length=10)  # VD: 12A, 1C
+
+    is_available = models.BooleanField(
+        default=True,
+        help_text="Ghế còn trống để book hay đã được giữ chỗ / sử dụng",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("flight", "seat_number")
+
+    def __str__(self):
+        return f"{self.flight} - {self.seat_number} ({self.seat_class})"
+
+
 class FlightBookingDetail(models.Model):
     booking = models.ForeignKey(
         Booking, on_delete=models.CASCADE, related_name="flight_details"
@@ -173,7 +202,15 @@ class FlightBookingDetail(models.Model):
     final_price = models.FloatField(default=0.0)
 
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now_add=True)
+
+    # Danh sách ghế cụ thể đã gán cho booking này
+    seats = models.ManyToManyField(
+        FlightSeat,
+        related_name="flight_bookings",
+        blank=True,
+        help_text="Các ghế cụ thể (12A, 12B, ...) đã được gán cho booking",
+    )
 
     def save(self, *args, **kwargs):
         # Tính toán giảm giá nếu có promotion

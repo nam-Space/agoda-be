@@ -15,6 +15,9 @@ from .views import (
     RoomAmenityDetailView,
     RoomAmenityUpdateView,
     RoomAmenityDeleteView,
+    PhysicalRoomListView,
+    PhysicalRoomCreateView,
+    PhysicalRoomDetailView,
 )
 
 urlpatterns = [
@@ -51,4 +54,7 @@ urlpatterns = [
         RoomAmenityDeleteView.as_view(),
         name="amenities-delete",
     ),
+    path("physical-rooms/", PhysicalRoomListView.as_view(), name="physical-room-list"),
+    path("physical-rooms/create/", PhysicalRoomCreateView.as_view(), name="physical-room-create"),
+    path("physical-rooms/<int:pk>/", PhysicalRoomDetailView.as_view(), name="physical-room-detail"),
 ]

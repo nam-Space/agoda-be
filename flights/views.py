@@ -2,7 +2,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework import viewsets
 from rest_framework.response import Response
 from datetime import datetime
-from .models import Flight, FlightLeg, FlightBookingDetail, SeatClassPricing
+from .models import Flight, FlightLeg, FlightBookingDetail, SeatClassPricing, FlightSeat
 from .serializers import (
     FlightBookingDetailSerializer,
     FlightLegSerializer,
@@ -11,11 +11,13 @@ from .serializers import (
     FlightLegGetListSerializer,
     SeatClassPricingGetListSerializer,
     FlightGetListSerializer,
+    FlightSeatSerializer,
 )
 from rest_framework import status
 from django.db.models import Q, Max, F, Min
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import generics
+from rest_framework.decorators import action
 
 
 class CommonPagination(PageNumberPagination):
@@ -365,6 +367,37 @@ class FlightViewSet(viewsets.ModelViewSet):
             {
                 "isSuccess": True,
                 "message": "Fetched flight details successfully!",
+                "data": serializer.data,
+            }
+        )
+
+    @action(detail=True, methods=["get"], url_path="seats")
+    def seats(self, request, pk=None):
+        """
+        Trả về danh sách ghế của flight:
+        - query param seat_class / seatClass: lọc theo hạng ghế
+        - query param only_available=true|false: chỉ lấy ghế còn trống (default: true)
+        """
+        flight = self.get_object()
+        seat_class = (
+            request.query_params.get("seat_class")
+            or request.query_params.get("seatClass")
+        )
+        only_available = (
+            request.query_params.get("only_available", "true").lower() == "true"
+        )
+
+        qs = FlightSeat.objects.filter(flight=flight)
+        if seat_class:
+            qs = qs.filter(seat_class=seat_class)
+        if only_available:
+            qs = qs.filter(is_available=True)
+
+        serializer = FlightSeatSerializer(qs.order_by("seat_number"), many=True)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched flight seats successfully!",
                 "data": serializer.data,
             }
         )
@@ -746,6 +779,100 @@ class SeatClassPricingViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+
+class FlightSeatListView(generics.ListAPIView):
+    queryset = FlightSeat.objects.all()
+    serializer_class = FlightSeatSerializer
+    authentication_classes = [JWTAuthentication]
+    pagination_class = CommonPagination
+
+    def get_queryset(self):
+        queryset = FlightSeat.objects.all()
+        flight_id = self.request.query_params.get('flight_id')
+        if flight_id:
+            queryset = queryset.filter(flight_id=flight_id)
+        seat_class = self.request.query_params.get('seat_class')
+        if seat_class:
+            queryset = queryset.filter(seat_class=seat_class)
+        return queryset
+    def list(self, request, *args, **kwargs):
+        self.paginator.context = {"message": "Fetched flight seats successfully!"}
+        return super().list(request, *args, **kwargs)
+
+class FlightSeatCreateView(generics.CreateAPIView):
+    queryset = FlightSeat.objects.all()
+    serializer_class = FlightSeatSerializer
+    authentication_classes = [JWTAuthentication]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "FlightSeat created successfully",
+                    "data": serializer.data,
+                }
+            )
+        return Response(
+            {
+                "isSuccess": False,
+                "message": "Failed to create FlightSeat",
+                "data": serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class FlightSeatDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = FlightSeat.objects.all()
+    serializer_class = FlightSeatSerializer
+    authentication_classes = [JWTAuthentication]
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "FlightSeat retrieved successfully",
+                "data": serializer.data,
+            }
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "FlightSeat updated successfully",
+                    "data": serializer.data,
+                }
+            )
+        return Response(
+            {
+                "isSuccess": False,
+                "message": "Failed to update FlightSeat",
+                "data": serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "FlightSeat deleted successfully",
+                "data": {},
+            },
+            status=status.HTTP_200_OK,
+        )
 
 class FlightBookingDetailViewSet(viewsets.ModelViewSet):
     queryset = FlightBookingDetail.objects.select_related("booking", "flight").all()

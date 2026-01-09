@@ -431,6 +431,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 payment.save()
         else:
             booking.payment_status = PaymentStatus.CANCELLED
+            payments = booking.payments.all()
             for payment in payments:
                 payment.status = PaymentStatus.CANCELLED
                 payment.save()
@@ -439,7 +440,30 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.save()
 
         service_type = booking.service_type
-        if service_type == ServiceType.ACTIVITY:
+        if service_type == ServiceType.HOTEL:
+            # Trả lại phòng khi hủy booking hotel
+            from rooms.models import RoomBookingDetail, PhysicalRoom
+
+            hotel_detail = getattr(booking, "hotel_detail", None)
+            if hotel_detail and isinstance(hotel_detail, RoomBookingDetail):
+                room = hotel_detail.room
+                room_count = hotel_detail.room_count or 0
+
+                # Tăng lại available_rooms (không vượt quá total_rooms)
+                if room and room_count > 0:
+                    room.available_rooms = min(
+                        room.total_rooms, room.available_rooms + room_count
+                    )
+                    room.save(update_fields=["available_rooms"])
+
+                # Đánh dấu các physical_rooms là có thể đặt lại
+                physical_rooms = list(hotel_detail.physical_rooms.all())
+                if physical_rooms:
+                    PhysicalRoom.objects.filter(
+                        id__in=[pr.id for pr in physical_rooms]
+                    ).update(is_available=True)
+
+        elif service_type == ServiceType.ACTIVITY:
             adult_quantity_booking = getattr(
                 getattr(booking, "activity_date_detail", None),
                 "adult_quantity_booking",
@@ -466,6 +490,32 @@ class BookingViewSet(viewsets.ModelViewSet):
                 driver.driver_status = "idle"
                 driver.save(update_fields=["driver_status"])
 
+        elif service_type == ServiceType.FLIGHT:
+            # Trả lại ghế khi hủy booking flight
+            from flights.models import FlightBookingDetail, SeatClassPricing, FlightSeat
+
+            flight_details = FlightBookingDetail.objects.filter(booking=booking)
+            for detail in flight_details:
+                flight = detail.flight
+                seat_class = detail.seat_class
+                num_passengers = detail.num_passengers or 0
+
+                # Tăng lại available_seats cho SeatClassPricing tương ứng
+                if flight and seat_class and num_passengers > 0:
+                    sc = flight.seat_classes.filter(seat_class=seat_class).first()
+                    if sc:
+                        sc.available_seats = min(
+                            sc.capacity, sc.available_seats + num_passengers
+                        )
+                        sc.save(update_fields=["available_seats"])
+
+                # Đánh dấu ghế cụ thể là trống lại
+                seats = list(detail.seats.all())
+                if seats:
+                    FlightSeat.objects.filter(id__in=[s.id for s in seats]).update(
+                        is_available=True
+                    )
+
         return Response(
             {
                 "isSuccess": True,
@@ -476,6 +526,121 @@ class BookingViewSet(viewsets.ModelViewSet):
                 "payment_status": booking.get_payment_status_display(),
                 "refund_amount": refund_amount,
                 "final_price": booking.final_price,  # Giữ nguyên để audit
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="complete")
+    def complete_booking(self, request, pk=None):
+        """API đánh dấu booking đã hoàn thành (sau khi sử dụng dịch vụ).
+
+        - Không hoàn tiền.
+        - Giải phóng tài nguyên (phòng khách sạn, tài xế xe, ghế máy bay) để có thể được đặt tiếp.
+        """
+        try:
+            booking = self.get_object()
+        except Booking.DoesNotExist:
+            return Response(
+                {"isSuccess": False, "message": "Booking not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Không xử lý nếu đã huỷ / đã hoàn thành
+        if booking.status == BookingStatus.CANCELLED:
+            return Response(
+                {"isSuccess": False, "message": "Booking đã bị hủy"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if booking.status == BookingStatus.COMPLETED:
+            return Response(
+                {"isSuccess": False, "message": "Booking đã ở trạng thái COMPLETED"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Thông thường chỉ cho complete khi đã CONFIRMED
+        if booking.status != BookingStatus.CONFIRMED:
+            return Response(
+                {
+                    "isSuccess": False,
+                    "message": "Chỉ có thể complete booking ở trạng thái CONFIRMED",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Cập nhật trạng thái
+        booking.status = BookingStatus.COMPLETED
+        booking.save(update_fields=["status"])
+
+        service_type = booking.service_type
+
+        if service_type == ServiceType.HOTEL:
+            # Hoàn trả phòng khi hoàn thành booking hotel (trả phòng)
+            from rooms.models import RoomBookingDetail, PhysicalRoom
+
+            hotel_detail = getattr(booking, "hotel_detail", None)
+            if hotel_detail and isinstance(hotel_detail, RoomBookingDetail):
+                room = hotel_detail.room
+                room_count = hotel_detail.room_count or 0
+
+                # Tăng lại available_rooms (không vượt quá total_rooms)
+                if room and room_count > 0:
+                    room.available_rooms = min(
+                        room.total_rooms, room.available_rooms + room_count
+                    )
+                    room.save(update_fields=["available_rooms"])
+
+                # Đánh dấu các physical_rooms là có thể đặt lại
+                physical_rooms = list(hotel_detail.physical_rooms.all())
+                if physical_rooms:
+                    PhysicalRoom.objects.filter(
+                        id__in=[pr.id for pr in physical_rooms]
+                    ).update(is_available=True)
+
+        elif service_type == ServiceType.CAR:
+            # Khi hoàn thành chuyến xe, trả trạng thái tài xế về idle
+            driver = getattr(getattr(booking, "car_detail", None), "driver", None)
+            if driver and driver.driver_status == "busy":
+                driver.driver_status = "idle"
+                driver.save(update_fields=["driver_status"])
+
+        elif service_type == ServiceType.FLIGHT:
+            # Khi hoàn thành chuyến bay, giải phóng ghế để có thể tái sử dụng cho chuyến khác (nếu business cần)
+            from flights.models import FlightBookingDetail, SeatClassPricing, FlightSeat
+
+            flight_details = FlightBookingDetail.objects.filter(booking=booking)
+            for detail in flight_details:
+                flight = detail.flight
+                seat_class = detail.seat_class
+                num_passengers = detail.num_passengers or 0
+
+                # Tăng lại available_seats cho SeatClassPricing tương ứng
+                if flight and seat_class and num_passengers > 0:
+                    sc = flight.seat_classes.filter(seat_class=seat_class).first()
+                    if sc:
+                        sc.available_seats = min(
+                            sc.capacity, sc.available_seats + num_passengers
+                        )
+                        sc.save(update_fields=["available_seats"])
+
+                # Đánh dấu ghế cụ thể là trống lại
+                seats = list(detail.seats.all())
+                if seats:
+                    FlightSeat.objects.filter(id__in=[s.id for s in seats]).update(
+                        is_available=True
+                    )
+
+        # Đối với ACTIVITY: participants đã được trừ khi booking, không cộng lại khi hoàn thành
+
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Booking đã được hoàn thành",
+                "booking_id": booking.id,
+                "booking_code": booking.booking_code,
+                "status": booking.get_status_display(),
+                "payment_status": booking.get_payment_status_display(),
+                "final_price": booking.final_price,
             },
             status=status.HTTP_200_OK,
         )

@@ -5,7 +5,7 @@ from rest_framework import generics
 from rest_framework.response import Response
 from django.db.models import Q, Prefetch
 from datetime import datetime
-from .models import Room, RoomImage, RoomAmenity, RoomBookingDetail
+from .models import Room, RoomImage, RoomAmenity, RoomBookingDetail, PhysicalRoom
 from .serializers import (
     RoomSerializer,
     RoomImageSerializer,
@@ -13,6 +13,7 @@ from .serializers import (
     RoomBookingDetailSerializer,
     RoomCreateSerializer,
     RoomAmenityCreateSerializer,
+    PhysicalRoomSerializer,
 )
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
@@ -684,7 +685,117 @@ class RoomAmenityDeleteView(generics.DestroyAPIView):
             status=status.HTTP_200_OK,
         )
 
+class PhysicalRoomListView(generics.ListAPIView):
+    queryset = PhysicalRoom.objects.all()
+    serializer_class = PhysicalRoomSerializer
+    pagination_class = CommonPagination
+    
+    def get_queryset(self):
+        queryset = PhysicalRoom.objects.all()
+        filter_params = self.request.query_params
+        
+        # Filter theo room_id
+        room_id = filter_params.get("room_id")
+        if room_id:
+            queryset = queryset.filter(room_id=int(room_id))
+        
+        # Có thể thêm filter khác nếu cần (ví dụ: is_available)
+        is_available = filter_params.get("is_available")
+        if is_available:
+            queryset = queryset.filter(is_available=is_available.lower() == 'true')
+        
+        return queryset
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            self.paginator.context = {"message": "Fetched physical rooms successfully!"}
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "Fetched physical rooms successfully!",
+                "meta": {"totalItems": queryset.count(), "pagination": None},
+                "data": serializer.data,
+            }
+        )
 
+class PhysicalRoomCreateView(generics.CreateAPIView):
+    queryset = PhysicalRoom.objects.all()
+    serializer_class = PhysicalRoomSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            physical_room = serializer.save()
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "PhysicalRoom created successfully",
+                    "data": PhysicalRoomSerializer(physical_room).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(
+            {
+                "isSuccess": False,
+                "message": "Failed to create PhysicalRoom",
+                "data": serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+class PhysicalRoomDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = PhysicalRoom.objects.all()
+    serializer_class = PhysicalRoomSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "PhysicalRoom retrieved successfully",
+                "data": serializer.data,
+            }
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "isSuccess": True,
+                    "message": "PhysicalRoom updated successfully",
+                    "data": serializer.data,
+                }
+            )
+        return Response(
+            {
+                "isSuccess": False,
+                "message": "Failed to update PhysicalRoom",
+                "data": serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {
+                "isSuccess": True,
+                "message": "PhysicalRoom deleted successfully",
+                "data": {},
+            },
+            status=status.HTTP_200_OK,
+        )
+    
 class RoomBookingDetailView(generics.RetrieveAPIView):
     queryset = RoomBookingDetail.objects.all()
     serializer_class = RoomBookingDetailSerializer

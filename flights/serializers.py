@@ -1,6 +1,12 @@
 from rest_framework import serializers
-from time import timezone
-from .models import Flight, FlightLeg, FlightBookingDetail, SeatClassPricing
+from django.utils import timezone
+from .models import (
+    Flight,
+    FlightLeg,
+    FlightBookingDetail,
+    SeatClassPricing,
+    FlightSeat,
+)
 from airports.models import Airport
 from airports.serializers import AirportSerializer
 from airlines.models import Airline, Aircraft
@@ -73,6 +79,12 @@ class SeatClassPricingSerializer(serializers.ModelSerializer):
 
     def get_price(self, obj):
         return obj.price()
+
+
+class FlightSeatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FlightSeat
+        fields = ["id", "flight", "seat_number", "seat_class", "is_available"]
 
 
 class FlightSimpleSerializer(serializers.ModelSerializer):
@@ -271,6 +283,10 @@ class FlightSerializer(serializers.ModelSerializer):
 # Serializer dùng cho tạo mới (write) FlightBookingDetail
 class FlightBookingDetailCreateSerializer(serializers.ModelSerializer):
     flight = serializers.PrimaryKeyRelatedField(queryset=Flight.objects.all())
+    # FE truyền danh sách số ghế cụ thể muốn chọn, ví dụ: ["12A", "12B"]
+    seat_numbers = serializers.ListField(
+        child=serializers.CharField(), write_only=True, required=True
+    )
 
     class Meta:
         model = FlightBookingDetail
@@ -279,33 +295,91 @@ class FlightBookingDetailCreateSerializer(serializers.ModelSerializer):
             "seat_class",
             "num_passengers",
             "total_price",
+            "seat_numbers",
         ]
 
     def validate(self, data):
-        flight = data.get('flight')
-        seat_class = data.get('seat_class')
-        num_passengers = data.get('num_passengers')
+        flight = data.get("flight")
+        seat_class = data.get("seat_class")
+        num_passengers = data.get("num_passengers")
+        seat_numbers = data.get("seat_numbers") or []
 
         # Validate seat_class exists
         seat_class_pricing = flight.seat_classes.filter(seat_class=seat_class).first()
         if not seat_class_pricing:
-            raise serializers.ValidationError(f"Seat class '{seat_class}' not available for this flight")
+            raise serializers.ValidationError(
+                f"Seat class '{seat_class}' not available for this flight"
+            )
 
-        # Validate availability
+        # Validate availability tổng quan theo hạng
         if num_passengers > seat_class_pricing.available_seats:
-            raise serializers.ValidationError(f"Only {seat_class_pricing.available_seats} seats available in {seat_class}")
+            raise serializers.ValidationError(
+                f"Only {seat_class_pricing.available_seats} seats available in {seat_class}"
+            )
+
+        # Validate số lượng seat_numbers khớp với num_passengers
+        if len(seat_numbers) != num_passengers:
+            raise serializers.ValidationError(
+                "Number of seat_numbers must match num_passengers"
+            )
+
+        # Validate từng ghế: tồn tại, đúng flight + seat_class, còn available
+        invalid_seats = []
+        for sn in seat_numbers:
+            seat = FlightSeat.objects.filter(
+                flight=flight, seat_class=seat_class, seat_number=sn
+            ).first()
+            if not seat or not seat.is_available:
+                invalid_seats.append(sn)
+
+        if invalid_seats:
+            raise serializers.ValidationError(
+                {
+                    "seat_numbers": [
+                        f"Seats not available or invalid: {', '.join(invalid_seats)}"
+                    ]
+                }
+            )
 
         # Validate departure_time > now (từ flight.legs)
-        first_leg = flight.legs.order_by('departure_time').first()
+        first_leg = flight.legs.order_by("departure_time").first()
         if first_leg and first_leg.departure_time < timezone.now():
             raise serializers.ValidationError("Flight departure time is in the past")
 
         return data
 
+    def create(self, validated_data):
+        """
+        Tạo FlightBookingDetail và gán ghế cụ thể theo danh sách FE truyền lên.
+        """
+        seat_numbers = validated_data.pop("seat_numbers", [])
+        flight = validated_data["flight"]
+        seat_class = validated_data["seat_class"]
+
+        # Lấy lại danh sách ghế theo seat_numbers (đã validate ở trên)
+        seats = list(
+            FlightSeat.objects.filter(
+                flight=flight, seat_class=seat_class, seat_number__in=seat_numbers
+            )
+        )
+
+        # Tạo booking detail
+        instance = FlightBookingDetail.objects.create(**validated_data)
+
+        # Gán ghế và đánh dấu đã chiếm
+        if seats:
+            instance.seats.set(seats)
+            FlightSeat.objects.filter(id__in=[s.id for s in seats]).update(
+                is_available=False
+            )
+
+        return instance
+
 
 # 👇 Dùng khi hiển thị trong Booking detail
 class FlightBookingDetailSerializer(serializers.ModelSerializer):
     flight = FlightSerializer(read_only=True)
+    seats = serializers.SerializerMethodField()
 
     class Meta:
         model = FlightBookingDetail
@@ -317,4 +391,9 @@ class FlightBookingDetailSerializer(serializers.ModelSerializer):
             "total_price",
             "discount_amount",
             "final_price",
+            "seats",
         ]
+
+    def get_seats(self, obj):
+        # Trả về danh sách số ghế, ví dụ: ["12A", "12B"]
+        return [seat.seat_number for seat in obj.seats.all()]

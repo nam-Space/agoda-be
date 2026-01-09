@@ -6,6 +6,9 @@ from .views import (
     FlightBookingDetailViewSet,
     FlightLegViewSet,
     SeatClassPricingViewSet,
+    FlightSeatListView,
+    FlightSeatCreateView,
+    FlightSeatDetailView,
 )
 
 router = DefaultRouter()
@@ -20,5 +23,8 @@ urlpatterns = [
     path(
         "flights-for-admin/", FlightListView.as_view(), name="flight-list"
     ),  # GET tất cả flights, phân trang cho admin, kể cả trường hợp flight mà có flightLeg bị rỗng
+    path("flight-seats/", FlightSeatListView.as_view(), name="flight-seat-list"),
+    path("flight-seats/create/", FlightSeatCreateView.as_view(), name="flight-seat-create"),
+    path("flight-seats/<int:pk>/", FlightSeatDetailView.as_view(), name="flight-seat-detail"),
     path("", include(router.urls)),
 ]
