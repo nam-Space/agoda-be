@@ -103,6 +103,30 @@ class Room(models.Model):
         }
 
 
+class PhysicalRoom(models.Model):
+    """
+    Phòng vật lý cụ thể: ví dụ 101, 102... thuộc một loại `Room`.
+    """
+
+    room = models.ForeignKey(
+        Room, on_delete=models.CASCADE, related_name="physical_rooms"
+    )
+    code = models.CharField(max_length=50)  # Số phòng / mã phòng, vd: 101, A1...
+    floor = models.IntegerField(null=True, blank=True)
+
+    # Trạng thái phòng có sẵn để đặt
+    is_available = models.BooleanField(
+        default=True,
+        help_text="Phòng có thể được đặt (không bị khóa / bảo trì)",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.room.hotel.name} - {self.room.room_type} - {self.code} (available={self.is_available})"
+
+
 # Model để lưu thông tin về hình ảnh phòng
 class RoomImage(models.Model):
     room = models.ForeignKey("Room", related_name="images", on_delete=models.CASCADE)
@@ -124,7 +148,6 @@ class RoomAmenity(models.Model):
         return f"{self.name} ({self.room.room_type})"
 
 
-# Thông tin chi tiết đặt phòng khách sạn
 class RoomBookingDetail(models.Model):
     booking = models.OneToOneField(
         Booking, on_delete=models.CASCADE, related_name="hotel_detail"
@@ -151,6 +174,14 @@ class RoomBookingDetail(models.Model):
     discount_amount = models.FloatField(default=0.0)
     final_price = models.FloatField(default=0.0)
 
+    # Danh sách các phòng cụ thể được gán cho booking này
+    physical_rooms = models.ManyToManyField(
+        PhysicalRoom,
+        related_name="room_booking_details",
+        blank=True,
+        help_text="Danh sách phòng cụ thể (101, 102, ...) được gán cho booking",
+    )
+
     def save(self, *args, **kwargs):
         # Tự động gán loại phòng nếu chưa có
         if not self.room_type and self.room:
@@ -161,7 +192,7 @@ class RoomBookingDetail(models.Model):
 
         # Tính tổng tiền phòng dựa trên stay_type
         if self.room and self.check_in and self.check_out:
-            if self.room.stay_type == 'dayuse':
+            if self.room.stay_type == "dayuse":
                 # Cho dayuse, dùng price_per_day, và có lẽ num_days = 1
                 self.total_price = float(self.room.price_per_day) * self.room_count
             else:
