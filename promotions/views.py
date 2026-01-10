@@ -305,12 +305,40 @@ class PromotionDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # Endpoint chung để tạo promotion với cấu trúc mới
 class PromotionCreateView(generics.CreateAPIView):
-    # serializer_class = PromotionCreateSerializer  # Không dùng serializer nữa
+    serializer_class = PromotionCreateSerializer
 
     def create(self, request, *args, **kwargs):
-        data = request.data
-        promotion_id = data.get("promotion_id")
-        promotion_type = data.get("type")
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        # promotion_id = data["promotion_id"]
+        promotion_type = data["type"]
+
+        # try:
+        #     promotion = Promotion.objects.get(id=promotion_id)
+        # except Promotion.DoesNotExist:
+        #     return Response(
+        #         {
+        #             "isSuccess": False,
+        #             "message": "Tạo promotion thất bại",
+        #             "error": "Không tìm thấy promotion",
+        #         },
+        #         status=status.HTTP_404_NOT_FOUND,
+        #     )
+
+        promotion = Promotion.objects.create(
+            title=data.get("title", "Promotion"),
+            description=data.get("description", None),
+            discount_percent=data.get("discount_percent", None),
+            discount_amount=data.get("discount_amount", None),
+            start_date=data.get("start_date", None),
+            end_date=data.get("end_date", None),
+            promotion_type=getattr(PromotionType, promotion_type.upper()),
+            image=data.get("image", None),
+        )
+
+        promotion_id = promotion.id
 
         if not promotion_id:
             return Response(
@@ -399,7 +427,7 @@ class PromotionCreateView(generics.CreateAPIView):
             rooms_response = []
             for room_data in rooms_data:
                 try:
-                    room = Room.objects.get(id=room_data["id"], hotel=hotel)
+                    room = Room.objects.get(id=room_data["id"])
                     discount_percent = (
                         room_data["discount_percent"]
                         if "discount_percent" in room_data
