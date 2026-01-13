@@ -3,4 +3,5 @@ venv/
 *.pyc
 # Environment variables
 .env
-.env.*
+.env*.local
+.env*.production
