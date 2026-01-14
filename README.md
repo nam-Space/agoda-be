@@ -160,20 +160,31 @@ Công nghệ:
 
 ## 8. Thiết kế Database
 
-### 8.1 Các bảng chính
+### 8.1. Sơ đồ use case tổng quan
+<img width="941" height="1236" alt="image" src="https://github.com/user-attachments/assets/89b3453c-674c-4363-af72-9658cdfbf516" />
 
-* User
-* Role
-* Hotel
-* Room
-* Booking
-* Taxi
-* Flight
-* Event
-* Promotion
-* Blog
+### 8.2 Các bảng chính
+<img width="940" height="969" alt="image" src="https://github.com/user-attachments/assets/b8c42994-c95f-4a54-a8f9-21e25a3df294" />
+<img width="940" height="1046" alt="image" src="https://github.com/user-attachments/assets/6b4b5b20-cdbf-4903-8a8c-44b4d567252a" />
 
-### 8.2 Đặc điểm
+### 8.3 Sơ đồ tuần tự
+* Thống kê doanh thu
+<img width="940" height="942" alt="image" src="https://github.com/user-attachments/assets/d25287dc-2aac-4484-a81c-186b2f128ac3" />
+
+* Đặt phòng khách sạn
+<img width="940" height="1096" alt="image" src="https://github.com/user-attachments/assets/4fba7575-cadc-4ea5-97dc-5cfff83169d4" />
+
+* Đặt vé máy bay
+<img width="940" height="952" alt="image" src="https://github.com/user-attachments/assets/330a2254-42d7-4c2f-8663-8acee3bd65a9" />
+
+* Đặt các hoạt động
+<img width="940" height="1015" alt="image" src="https://github.com/user-attachments/assets/32c0cc79-d526-4939-a97e-9ec2d0dc08c6" />
+
+* Đặt xe đưa đón sân bay
+<img width="940" height="963" alt="image" src="https://github.com/user-attachments/assets/1a345a84-5b14-428a-a579-a95a79383552" />
+
+
+### 8.4 Đặc điểm
 
 * Chuẩn hoá dữ liệu
 * Quan hệ rõ ràng
